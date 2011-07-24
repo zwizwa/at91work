@@ -34,8 +34,8 @@
 
 # Chip & board used for compilation
 # (can be overriden by adding CHIP=chip and BOARD=board to the command-line)
-CHIP  = at91sam7se512
-BOARD = at91sam7se-ek
+CHIP  = at91sam7s256
+BOARD = at91sam7s-ek
 
 # Trace level used for compilation
 # (can be overriden by adding TRACE_LEVEL=#number to the command-line)
