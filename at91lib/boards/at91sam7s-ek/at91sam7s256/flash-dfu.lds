@@ -28,7 +28,7 @@
  */
 
 /*------------------------------------------------------------------------------
- *      Linker script for running in internal Flash on the AT91SAM7S256.
+ *    Linker script for running in DFU Flash partion the AT91SAM7S256.
  *----------------------------------------------------------------------------*/
 
 OUTPUT_FORMAT("elf32-littlearm", "elf32-littlearm", "elf32-littlearm")
@@ -37,13 +37,15 @@ ENTRY(entry)
 
 MEMORY
 {
-    sram (W!RX) : ORIGIN = 0x200000, LENGTH = 0x10000
-    flash (RX) : ORIGIN = 0x100000, LENGTH = 0x40000
+    /* adjusted for DFU partition */
+    sram (W!RX) : ORIGIN = 0x200028, LENGTH = (0x10000 - 0x28)
+    flash (RX) : ORIGIN  = 0x104000, LENGTH = (0x40000 - 0x4000 - 0x400)
 }
 
 SECTIONS
-{  
-    .fixed :
+{
+    . = 0x000000000;
+    .fixed 0x00104000: AT ( 0x00000000 )
     {
         . = ALIGN(4);
         _sfixed = .;
@@ -53,7 +55,7 @@ SECTIONS
         _efixed = .;
     } >flash
 
-    .relocate : AT (_efixed)
+    .relocate 0x00200028: AT ( SIZEOF(.fixed) )
     {
         . = ALIGN(4);
         _srelocate = .;
