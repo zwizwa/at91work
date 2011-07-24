@@ -57,7 +57,7 @@
 /* Exception vectors
  *******************/
             .section    .vectors, "a"
-
+#ifndef flash_dfu
 resetVector:
         ldr     pc, =resetHandler       /* Reset */
 undefVector:
@@ -114,7 +114,7 @@ irqHandler:
         ldmia   sp!, {r0, lr}
         msr     SPSR_cxsf, lr
         ldmia   sp!, {pc}^
-
+#endif /* flash_dfu */
 //------------------------------------------------------------------------------
 /// Initializes the chip and branches to the main() function.
 //------------------------------------------------------------------------------
@@ -124,6 +124,7 @@ irqHandler:
 entry:
 resetHandler:
 
+#ifndef flash_dfu
 /* Dummy access to the .vectors section so it does not get optimized */
         ldr     r0, =resetVector
 
@@ -137,7 +138,7 @@ resetHandler:
 	    ldr     r0, =LowLevelInit
         mov     lr, pc
         bx      r0
-
+#endif /* flash_dfu */
 /* Initialize the relocate segment */
 
         ldr     r0, =_efixed
@@ -158,6 +159,7 @@ resetHandler:
         strcc   r2, [r0], #4
         bcc     1b
 
+#ifndef flash_dfu
 /* Setup stacks
  **************/
 /* IRQ mode */
@@ -168,7 +170,7 @@ resetHandler:
 /* Supervisor mode (interrupts enabled) */
         msr     CPSR_c, #ARM_MODE_SVC | F_BIT
         mov     sp, r4
-
+#endif /* flash_dfu */
 /* Branch to main()
  ******************/
         ldr     r0, =main
