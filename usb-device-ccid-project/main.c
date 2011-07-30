@@ -141,6 +141,13 @@ unsigned char USBState = STATE_IDLE;
 static const Pin pinsISO7816[]    = {PINS_ISO7816};
 static const Pin pinIso7816RstMC  = PIN_ISO7816_RSTMC;
 
+static const Pin pinsPower[] = {
+	/* low = off */
+	{1 << 5, AT91C_BASE_PIOA, AT91C_ID_PIOA, PIO_OUTPUT_0, PIO_DEFAULT},
+	/* high = off */
+	{1 << 26, AT91C_BASE_PIOA, AT91C_ID_PIOA, PIO_OUTPUT_1, PIO_DEFAULT},
+};
+
 //------------------------------------------------------------------------------
 //         Optional smartcard detection
 //------------------------------------------------------------------------------
@@ -155,16 +162,20 @@ static const Pin pinSmartCard = PIN_SMARTCARD_CONNECT;
 //------------------------------------------------------------------------------
 static void ISR_PioSmartCard(const Pin *pPin)
 {
+	printf("-H- ISR_PioSmartCard\n\r");
     // Check all pending interrupts
     if ((pinSmartCard.pio->PIO_ISR & pinSmartCard.mask) != 0) {
+	printf("-H- SmartCard.mask\n\r");
 
         // Check current level on pin
         if (PIO_Get(&pinSmartCard) == 0) {
 
+		printf("-H- Insert\n\r");
             CCID_Insertion();
         }
         else {
 
+		printf("-H- Removal\n\r");
             CCID_Removal();
         }
     }
@@ -529,6 +540,11 @@ int main( void )
 
     // Configure ISO7816 driver
     PIO_Configure(pinsISO7816, PIO_LISTSIZE(&pinsISO7816));
+    PIO_Configure(pinsPower, PIO_LISTSIZE(&pinsPower));
+
+    /* power up the card */
+    PIO_Set(&pinsPower[0]);
+
     ISO7816_Init( pinIso7816RstMC );
 
     // USB audio driver initialization
@@ -545,13 +561,13 @@ int main( void )
 
         if( USBState == STATE_SUSPEND ) {
             TRACE_DEBUG("suspend  !\n\r");
-            //LowPowerMode();
+            LowPowerMode();
             USBState = STATE_IDLE;
         }
         if( USBState == STATE_RESUME ) {
             // Return in normal MODE
             TRACE_DEBUG("resume !\n\r");
-            //NormalPowerMode();
+            NormalPowerMode();
             USBState = STATE_IDLE;
         }
         CCID_SmartCardRequest();
