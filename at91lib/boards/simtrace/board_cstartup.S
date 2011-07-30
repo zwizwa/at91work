@@ -130,6 +130,7 @@ resetHandler:
 
 /* Set pc to actual code location (i.e. not in remap zone) */
 	    ldr     pc, =1f
+#endif /* flash_dfu */
 
 /* Perform low-level initialization of the chip using LowLevelInit() */
 1:
@@ -138,12 +139,6 @@ resetHandler:
 	    ldr     r0, =LowLevelInit
         mov     lr, pc
         bx      r0
-#else
-	/* explicitly disable the watchdog timer */
-	ldr	r0, =AT91C_BASE_WDTC
-	mov	r1, #AT91C_WDTC_WDDIS
-	str	r1, [r0, #4]
-#endif /* flash_dfu */
 /* Initialize the relocate segment */
 
         ldr     r0, =_efixed

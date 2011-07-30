@@ -232,7 +232,8 @@
 /// - PINS_ISO7816
 
 /// Smartcard detection pin
-#define PIN_SMARTCARD_CONNECT   {1 << 8, AT91C_BASE_PIOA, AT91C_ID_PIOA, PIO_INPUT, PIO_DEFAULT}
+#define PIN_SMARTCARD_CONNECT   {1 << 8, AT91C_BASE_PIOA, AT91C_ID_PIOA, PIO_INPUT, \
+				 PIO_PULLUP|PIO_DEGLITCH}
 /// PIN used for reset the smartcard
 #define PIN_ISO7816_RSTMC       {1 << 7, AT91C_BASE_PIOA, AT91C_ID_PIOA, PIO_OUTPUT_0, PIO_DEFAULT}
 /// Pins used for connect the smartcard

@@ -149,8 +149,10 @@ void LowLevelInit(void)
     // Watchdog initialization
     AT91C_BASE_WDTC->WDTC_WDMR = AT91C_WDTC_WDDIS;
 
+#if !defined(flash_dfu)
     // Remap the internal SRAM at 0x0
     BOARD_RemapRam();
+#endif
 
     // Disable RTT and PIT interrupts (potential problem when program A
     // configures RTT, then program B wants to use PIT only, interrupts
