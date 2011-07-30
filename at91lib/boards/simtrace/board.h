@@ -192,8 +192,6 @@
 /// SPI chip select 0 pin definition (PA11).
 #define PIN_SPI_NPCS0  {1 << 11, AT91C_BASE_PIOA, AT91C_ID_PIOA, PIO_PERIPH_A, PIO_DEFAULT}
 
-/// USB VBus monitoring pin definition (PA13).
-//#define PIN_USB_VBUS    {1 << 13, AT91C_BASE_PIOA, AT91C_ID_PIOA, PIO_INPUT, PIO_DEFAULT}
 /// USB pull-up control pin definition (PA16).
 #define PIN_USB_PULLUP  {1 << 16, AT91C_BASE_PIOA, AT91C_ID_PIOA, PIO_OUTPUT_1, PIO_DEFAULT}
 //------------------------------------------------------------------------------
