@@ -183,7 +183,7 @@ static const CCIDDriverConfigurationDescriptors configurationDescriptorsFS = {
         CCID1_10,               // bcdCCID: CCID version
         0,               // bMaxSlotIndex: Value 0 indicates that one slot is supported
         VOLTS_5_0,       // bVoltageSupport
-        PROTOCOL_TO,     // dwProtocols
+        (1 << PROTOCOL_TO),     // dwProtocols
         3580,            // dwDefaultClock
         3580,            // dwMaxClock
         0,               // bNumClockSupported
@@ -194,6 +194,7 @@ static const CCIDDriverConfigurationDescriptors configurationDescriptorsFS = {
         0,               // dwSynchProtocols
         0,               // dwMechanical
         //0x00010042,      // dwFeatures: Short APDU level exchanges
+        CCID_FEATURES_AUTO_CLOCK | CCID_FEATURES_AUTO_BAUD |
         CCID_FEATURES_AUTO_PCONF | CCID_FEATURES_AUTO_PNEGO | CCID_FEATURES_EXC_TPDU,
         0x0000010F,      // dwMaxCCIDMessageLength: For extended APDU level the value shall be between 261 + 10
         0xFF,            // bClassGetResponse: Echoes the class of the APDU
@@ -268,7 +269,7 @@ static const CCIDDriverConfigurationDescriptors configurationDescriptorsHS = {
         CCID1_10,               // bcdCCID: CCID version
         0,               // bMaxSlotIndex: Value 0 indicates that one slot is supported
         VOLTS_5_0,       // bVoltageSupport
-        PROTOCOL_TO,     // dwProtocols
+        (1 << PROTOCOL_TO),     // dwProtocols
         3580,            // dwDefaultClock
         3580,            // dwMaxClock
         0,               // bNumClockSupported
@@ -279,6 +280,7 @@ static const CCIDDriverConfigurationDescriptors configurationDescriptorsHS = {
         0,               // dwSynchProtocols
         0,               // dwMechanical
         //0x00010042,      // dwFeatures: Short APDU level exchanges
+        CCID_FEATURES_AUTO_CLOCK | CCID_FEATURES_AUTO_BAUD |
         CCID_FEATURES_AUTO_PCONF | CCID_FEATURES_AUTO_PNEGO | CCID_FEATURES_EXC_TPDU,
         0x0000010F,      // dwMaxCCIDMessageLength: For extended APDU level the value shall be between 261 + 10
         0xFF,            // bClassGetResponse: Echoes the class of the APDU
@@ -367,7 +369,7 @@ static const CCIDDriverConfigurationDescriptors sOtherSpeedConfigurationFS = {
         CCID1_10,               // bcdCCID: CCID version
         0,               // bMaxSlotIndex: Value 0 indicates that one slot is supported
         VOLTS_5_0,       // bVoltageSupport
-        PROTOCOL_TO,     // dwProtocols
+        (1 << PROTOCOL_TO),     // dwProtocols
         3580,            // dwDefaultClock
         3580,            // dwMaxClock
         0,               // bNumClockSupported
@@ -378,6 +380,7 @@ static const CCIDDriverConfigurationDescriptors sOtherSpeedConfigurationFS = {
         0,               // dwSynchProtocols
         0,               // dwMechanical
         //0x00010042,      // dwFeatures: Short APDU level exchanges
+        CCID_FEATURES_AUTO_CLOCK | CCID_FEATURES_AUTO_BAUD |
         CCID_FEATURES_AUTO_PCONF | CCID_FEATURES_AUTO_PNEGO | CCID_FEATURES_EXC_TPDU,
         0x0000010F,      // dwMaxCCIDMessageLength: For extended APDU level the value shall be between 261 + 10
         0xFF,            // bClassGetResponse: Echoes the class of the APDU
@@ -452,7 +455,7 @@ static const CCIDDriverConfigurationDescriptors sOtherSpeedConfigurationHS = {
         CCID1_10,               // bcdCCID: CCID version
         0,               // bMaxSlotIndex: Value 0 indicates that one slot is supported
         VOLTS_5_0,       // bVoltageSupport
-        PROTOCOL_TO,     // dwProtocols
+        (1 << PROTOCOL_TO),     // dwProtocols
         3580,            // dwDefaultClock
         3580,            // dwMaxClock
         0,               // bNumClockSupported
@@ -463,7 +466,8 @@ static const CCIDDriverConfigurationDescriptors sOtherSpeedConfigurationHS = {
         0,               // dwSynchProtocols
         0,               // dwMechanical
         //0x00010042,      // dwFeatures: Short APDU level exchanges
-        CCID_FEATURES_AUTO_PCONF | CCID_FEATURES_AUTO_PNEGO | CCID_FEATURES_EXC_TPDU,
+        CCID_FEATURES_AUTO_CLOCK | CCID_FEATURES_AUTO_BAUD |
+	CCID_FEATURES_AUTO_PCONF | CCID_FEATURES_AUTO_PNEGO | CCID_FEATURES_EXC_TPDU,
         0x0000010F,      // dwMaxCCIDMessageLength: For extended APDU level the value shall be between 261 + 10
         0xFF,            // bClassGetResponse: Echoes the class of the APDU
         0xFF,            // bClassEnvelope: Echoes the class of the APDU
