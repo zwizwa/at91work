@@ -545,13 +545,13 @@ int main( void )
 
         if( USBState == STATE_SUSPEND ) {
             TRACE_DEBUG("suspend  !\n\r");
-            LowPowerMode();
+            //LowPowerMode();
             USBState = STATE_IDLE;
         }
         if( USBState == STATE_RESUME ) {
             // Return in normal MODE
             TRACE_DEBUG("resume !\n\r");
-            NormalPowerMode();
+            //NormalPowerMode();
             USBState = STATE_IDLE;
         }
         CCID_SmartCardRequest();
