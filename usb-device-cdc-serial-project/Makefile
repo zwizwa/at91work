@@ -34,8 +34,8 @@
 
 # Chip & board used for compilation
 # (can be overriden by adding CHIP=chip and BOARD=board to the command-line)
-CHIP  = at91sam7s256
-BOARD = at91sam7s-ek
+CHIP  = at91sam7s128
+BOARD = simtrace
 
 # Trace level used for compilation
 # (can be overriden by adding TRACE_LEVEL=#number to the command-line)
@@ -68,7 +68,7 @@ OBJ = obj
 #-------------------------------------------------------------------------------
 
 # Tool suffix when cross-compiling
-CROSS_COMPILE = arm-none-eabi-
+CROSS_COMPILE = arm-elf-
 
 # Compilation tools
 CC = $(CROSS_COMPILE)gcc
