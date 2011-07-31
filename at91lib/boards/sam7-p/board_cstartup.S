@@ -130,6 +130,7 @@ resetHandler:
 
 /* Set pc to actual code location (i.e. not in remap zone) */
 	    ldr     pc, =1f
+#endif /* flash_dfu */
 
 /* Perform low-level initialization of the chip using LowLevelInit() */
 1:
@@ -138,7 +139,6 @@ resetHandler:
 	    ldr     r0, =LowLevelInit
         mov     lr, pc
         bx      r0
-#endif /* flash_dfu */
 /* Initialize the relocate segment */
 
         ldr     r0, =_efixed
