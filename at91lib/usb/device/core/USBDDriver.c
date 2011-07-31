@@ -58,9 +58,9 @@ static const USBConfigurationDescriptor *GetCurConfigDesc(USBDDriver *pDriver)
 
 	// Use different descriptor depending on device speed
 	if (USBD_IsHighSpeed())
-		return &pDriver->pDescriptors->pHsConfiguration[cfgidx];
+		return pDriver->pDescriptors->pHsConfiguration[cfgidx];
 	else
-		return &pDriver->pDescriptors->pFsConfiguration[cfgidx];
+		return pDriver->pDescriptors->pFsConfiguration[cfgidx];
 }
 
 static const USBConfigurationDescriptor *GetCurOtherSpeedDesc(USBDDriver *pDriver)
@@ -72,9 +72,9 @@ static const USBConfigurationDescriptor *GetCurOtherSpeedDesc(USBDDriver *pDrive
 
 	// Use different descriptor depending on device speed
 	if (USBD_IsHighSpeed())
-		return &pDriver->pDescriptors->pHsOtherSpeed[cfgidx];
+		return pDriver->pDescriptors->pHsOtherSpeed[cfgidx];
 	else
-		return &pDriver->pDescriptors->pFsOtherSpeed[cfgidx];
+		return pDriver->pDescriptors->pFsOtherSpeed[cfgidx];
 }
 
 

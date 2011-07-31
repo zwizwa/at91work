@@ -884,14 +884,14 @@ const unsigned char *stringDescriptors[] = {
 const USBDDriverDescriptors compositedDriverDescriptors = {
 
     &deviceDescriptor,
-    (const USBConfigurationDescriptor *) &configurationDescriptors,
+    { (const USBConfigurationDescriptor *) &configurationDescriptors },
 #ifdef BOARD_USB_UDPHS
     &qualifierDescriptor,
-    (const USBConfigurationDescriptor *) &configurationDescriptors,
+    { (const USBConfigurationDescriptor *) &configurationDescriptors },
     &deviceDescriptor,
-    (const USBConfigurationDescriptor *) &configurationDescriptors,
+    { (const USBConfigurationDescriptor *) &configurationDescriptors },
     &qualifierDescriptor,
-    (const USBConfigurationDescriptor *) &configurationDescriptors,
+    { (const USBConfigurationDescriptor *) &configurationDescriptors },
 #else
     0, 0, 0, 0, 0, 0,
 #endif

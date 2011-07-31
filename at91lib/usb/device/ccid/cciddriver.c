@@ -597,14 +597,14 @@ static const unsigned char *stringDescriptors[] = {
 const USBDDriverDescriptors ccidDriverDescriptors = {
 
     &deviceDescriptor, // FS
-    (USBConfigurationDescriptor *) &configurationDescriptorsFS,
+    { (USBConfigurationDescriptor *) &configurationDescriptorsFS },
 #ifdef BOARD_USB_UDPHS
     (USBDeviceQualifierDescriptor *) &deviceQualifierDescriptor, // FS
-    (USBConfigurationDescriptor *) &sOtherSpeedConfigurationFS,
+    { (USBConfigurationDescriptor *) &sOtherSpeedConfigurationFS },
     &deviceDescriptor, // HS
-    (USBConfigurationDescriptor *) &configurationDescriptorsHS,
+    { (USBConfigurationDescriptor *) &configurationDescriptorsHS },
     (USBDeviceQualifierDescriptor *) &deviceQualifierDescriptor, // HS
-    (USBConfigurationDescriptor *) &sOtherSpeedConfigurationHS,
+    { (USBConfigurationDescriptor *) &sOtherSpeedConfigurationHS },
 #else
     0, // No qualifier descriptor FS
     0, // No other-speed configuration FS

@@ -608,14 +608,14 @@ const unsigned char *stringDescriptors[] = {
 USBDDriverDescriptors cdcdSerialDriverDescriptors = {
 
     &deviceDescriptor,
-    (USBConfigurationDescriptor *) &(configurationDescriptors),
+    { (USBConfigurationDescriptor *) &(configurationDescriptors) },
 #ifdef BOARD_USB_UDPHS
     &qualifierDescriptor,
-    (USBConfigurationDescriptor *) &(otherSpeedDescriptorsFS),
+    { (USBConfigurationDescriptor *) &(otherSpeedDescriptorsFS) },
     &deviceDescriptor,
-    (USBConfigurationDescriptor *) &(configurationDescriptorsHS),
+    { (USBConfigurationDescriptor *) &(configurationDescriptorsHS) },
     &qualifierDescriptor,
-    (USBConfigurationDescriptor *) &(otherSpeedDescriptorsHS),
+    { (USBConfigurationDescriptor *) &(otherSpeedDescriptorsHS) },
 #else
     0, // No full-speed device qualifier descriptor
     0, // No full-speed other speed configuration

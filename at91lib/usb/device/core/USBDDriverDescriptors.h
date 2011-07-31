@@ -47,6 +47,8 @@
 #include <usb/common/core/USBConfigurationDescriptor.h>
 #include <usb/common/core/USBDeviceQualifierDescriptor.h>
 
+#define USBD_NUM_CONFIGS	4
+
 //------------------------------------------------------------------------------
 //         Types
 //------------------------------------------------------------------------------
@@ -62,19 +64,19 @@ typedef struct {
     /// Pointer to the full-speed device descriptor.
     const USBDeviceDescriptor *pFsDevice;
     /// Pointer to the full-speed configuration descriptor.
-    const USBConfigurationDescriptor *pFsConfiguration;
+    const USBConfigurationDescriptor *pFsConfiguration[USBD_NUM_CONFIGS];
     /// Pointer to the full-speed qualifier descriptor.
     const USBDeviceQualifierDescriptor *pFsQualifier;
     /// Pointer to the full-speed other speed configuration descriptor.
-    const USBConfigurationDescriptor *pFsOtherSpeed;
+    const USBConfigurationDescriptor *pFsOtherSpeed[USBD_NUM_CONFIGS];
     /// Pointer to the high-speed device descriptor.
     const USBDeviceDescriptor *pHsDevice;
     /// Pointer to the high-speed configuration descriptor.
-    const USBConfigurationDescriptor *pHsConfiguration;
+    const USBConfigurationDescriptor *pHsConfiguration[USBD_NUM_CONFIGS];
     /// Pointer to the high-speed qualifier descriptor.
     const USBDeviceQualifierDescriptor *pHsQualifier;
     /// Pointer to the high-speed other speed configuration descriptor.
-    const USBConfigurationDescriptor *pHsOtherSpeed;
+    const USBConfigurationDescriptor *pHsOtherSpeed[USBD_NUM_CONFIGS];
     /// Pointer to the list of string descriptors.
     const unsigned char **pStrings;
     /// Number of string descriptors in list.
