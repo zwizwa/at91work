@@ -62,9 +62,9 @@ extern const struct USBStringDescriptor USBDFU_string3;
 
 #define DFU_NUM_STRINGS	3
 #define DFU_STRING_DESCRIPTORS	\
-	&USBDFU_string1,	\
-	&USBDFU_string2,	\
-	&USBDFU_string3,
+	(const unsigned char *) &USBDFU_string1,	\
+	(const unsigned char *) &USBDFU_string2,	\
+	(const unsigned char *) &USBDFU_string3,
 
 #else /* BOARD_USB_DFU */
 
