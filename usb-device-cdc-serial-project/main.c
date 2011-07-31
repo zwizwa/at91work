@@ -182,7 +182,7 @@
 unsigned char USBState = STATE_IDLE;
 
 /// List of pins that must be configured for use by the application.
-static const Pin pins[] = {PIN_USART0_TXD, PIN_USART0_RXD};
+static const Pin pins[] = {PIN_USART1_TXD, PIN_USART1_RXD};
 
 /// Double-buffer for storing incoming USART data.
 static unsigned char usartBuffers[2][DATABUFFERSIZE];
@@ -491,20 +491,20 @@ static void ISR_Timer0()
     if ((status & AT91C_TC_CPCS) != 0) {
     
         // Flush PDC buffer
-        size = DATABUFFERSIZE - AT91C_BASE_US0->US_RCR;
+        size = DATABUFFERSIZE - AT91C_BASE_US1->US_RCR;
         if (size == 0) {
 
             AT91C_BASE_TC0->TC_CCR = AT91C_TC_CLKEN | AT91C_TC_SWTRG;
             return;
         }
-        AT91C_BASE_US0->US_RCR = 0;
+        AT91C_BASE_US1->US_RCR = 0;
     
         // Send current buffer through the USB
         while (CDCDSerialDriver_Write(usartBuffers[usartCurrentBuffer],
                                       size, 0, 0) != USBD_STATUS_SUCCESS);
     
         // Restart read on buffer
-        USART_ReadBuffer(AT91C_BASE_US0,
+        USART_ReadBuffer(AT91C_BASE_US1,
                          usartBuffers[usartCurrentBuffer],
                          DATABUFFERSIZE);
         usartCurrentBuffer = 1 - usartCurrentBuffer;
@@ -554,8 +554,8 @@ static void UsbDataReceived(unsigned int unused,
     if (status == USBD_STATUS_SUCCESS) {
 
         // Send data through USART
-        while (!USART_WriteBuffer(AT91C_BASE_US0, usbBuffer, received));
-        AT91C_BASE_US0->US_IER = AT91C_US_TXBUFE;
+        while (!USART_WriteBuffer(AT91C_BASE_US1, usbBuffer, received));
+        AT91C_BASE_US1->US_IER = AT91C_US_TXBUFE;
 
         // Check if bytes have been discarded
         if ((received == DATABUFFERSIZE) && (remaining > 0)) {
@@ -572,17 +572,17 @@ static void UsbDataReceived(unsigned int unused,
 }
 
 //------------------------------------------------------------------------------
-/// Handles interrupts coming from USART #0.
+/// Handles interrupts coming from USART #1.
 //------------------------------------------------------------------------------
 static void ISR_Usart0()
 {
-    unsigned int status = AT91C_BASE_US0->US_CSR;
+    unsigned int status = AT91C_BASE_US1->US_CSR;
     unsigned short serialState;
 
     // If USB device is not configured, do nothing
     if (USBD_GetState() != USBD_STATE_CONFIGURED) {
 
-        AT91C_BASE_US0->US_IDR = 0xFFFFFFFF;
+        AT91C_BASE_US1->US_IDR = 0xFFFFFFFF;
         return;
     }
 
@@ -597,7 +597,7 @@ static void ISR_Usart0()
                                       DATABUFFERSIZE, 0, 0) != USBD_STATUS_SUCCESS);
 
         // Restart read on buffer
-        USART_ReadBuffer(AT91C_BASE_US0,
+        USART_ReadBuffer(AT91C_BASE_US1,
                          usartBuffers[usartCurrentBuffer],
                          DATABUFFERSIZE);
         usartCurrentBuffer = 1 - usartCurrentBuffer;
@@ -614,7 +614,7 @@ static void ISR_Usart0()
                               DATABUFFERSIZE,
                               (TransferCallback) UsbDataReceived,
                               0);
-        AT91C_BASE_US0->US_IDR = AT91C_US_TXBUFE;
+        AT91C_BASE_US1->US_IDR = AT91C_US_TXBUFE;
     }
 
     // Errors
@@ -656,16 +656,16 @@ int main()
 
     // Configure USART
     PIO_Configure(pins, PIO_LISTSIZE(pins));
-    AT91C_BASE_PMC->PMC_PCER = 1 << AT91C_ID_US0;
-    AT91C_BASE_US0->US_IDR = 0xFFFFFFFF;
-    USART_Configure(AT91C_BASE_US0,
+    AT91C_BASE_PMC->PMC_PCER = 1 << AT91C_ID_US1;
+    AT91C_BASE_US1->US_IDR = 0xFFFFFFFF;
+    USART_Configure(AT91C_BASE_US1,
                     USART_MODE_ASYNCHRONOUS,
                     115200,
                     BOARD_MCK);
-    USART_SetTransmitterEnabled(AT91C_BASE_US0, 1);
-    USART_SetReceiverEnabled(AT91C_BASE_US0, 1);
-    AIC_ConfigureIT(AT91C_ID_US0, 0, ISR_Usart0);
-    AIC_EnableIT(AT91C_ID_US0);
+    USART_SetTransmitterEnabled(AT91C_BASE_US1, 1);
+    USART_SetReceiverEnabled(AT91C_BASE_US1, 1);
+    AIC_ConfigureIT(AT91C_ID_US1, 0, ISR_Usart0);
+    AIC_EnableIT(AT91C_ID_US1);
 
     // Configure timer 0
     AT91C_BASE_PMC->PMC_PCER = (1 << AT91C_ID_TC0);
@@ -699,9 +699,9 @@ int main()
 
             // Start receiving data on the USART
             usartCurrentBuffer = 0;
-            USART_ReadBuffer(AT91C_BASE_US0, usartBuffers[0], DATABUFFERSIZE);
-            USART_ReadBuffer(AT91C_BASE_US0, usartBuffers[1], DATABUFFERSIZE);
-            AT91C_BASE_US0->US_IER = AT91C_US_ENDRX
+            USART_ReadBuffer(AT91C_BASE_US1, usartBuffers[0], DATABUFFERSIZE);
+            USART_ReadBuffer(AT91C_BASE_US1, usartBuffers[1], DATABUFFERSIZE);
+            AT91C_BASE_US1->US_IER = AT91C_US_ENDRX
                                      | AT91C_US_FRAME
                                      | AT91C_US_OVER;
             AT91C_BASE_TC0->TC_CCR = AT91C_TC_CLKEN | AT91C_TC_SWTRG;
