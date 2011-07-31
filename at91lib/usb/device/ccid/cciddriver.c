@@ -49,6 +49,7 @@
 #include <usb/device/core/USBDDriver.h>
 #include <usb/common/core/USBGenericRequest.h>
 #include <usb/common/core/USBStringDescriptor.h>
+#include <usb/device/dfu/dfu.h>
 #include <usb/device/ccid/cciddriver.h>
 #include <usb/device/ccid/cciddriverdescriptors.h>
 #include <iso7816/iso7816_4.h>
@@ -89,7 +90,9 @@ typedef struct {
     USBEndpointDescriptor      bulkIn;
     /// Interrupt OUT endpoint descriptor
     USBEndpointDescriptor      interruptIn;
-
+#ifdef BOARD_USB_DFU
+    USBInterfaceDescriptor	dfu_interface[DFU_NUM_IF];
+#endif
 } __attribute__ ((packed)) CCIDDriverConfigurationDescriptors;
 
 //------------------------------------------------------------------------------
@@ -157,7 +160,7 @@ static const CCIDDriverConfigurationDescriptors configurationDescriptorsFS = {
         sizeof(USBConfigurationDescriptor),
         USBGenericDescriptor_CONFIGURATION,
         sizeof(CCIDDriverConfigurationDescriptors),
-        1, // One interface in this configuration
+        1+DFU_NUM_IF, // One interface in this configuration
         1, // This is configuration #1
         0, // No associated string descriptor
         BOARD_USB_BMATTRIBUTES,
@@ -232,7 +235,8 @@ static const CCIDDriverConfigurationDescriptors configurationDescriptorsFS = {
         MIN(BOARD_USB_ENDPOINTS_MAXPACKETSIZE(CCID_EPT_NOTIFICATION),
             USBEndpointDescriptor_MAXINTERRUPTSIZE_FS),
         0x10                              
-    }
+    },
+    DFU_IF_DESCRIPTORS
 };
 
 #ifdef BOARD_USB_UDPHS
@@ -243,7 +247,7 @@ static const CCIDDriverConfigurationDescriptors configurationDescriptorsHS = {
         sizeof(USBConfigurationDescriptor),
         USBGenericDescriptor_CONFIGURATION,
         sizeof(CCIDDriverConfigurationDescriptors),
-        1, // One interface in this configuration
+        1+DFU_NUM_IF, // One interface in this configuration
         1, // This is configuration #1
         0, // No associated string descriptor
         BOARD_USB_BMATTRIBUTES,
@@ -318,7 +322,8 @@ static const CCIDDriverConfigurationDescriptors configurationDescriptorsHS = {
         MIN(BOARD_USB_ENDPOINTS_MAXPACKETSIZE(CCID_EPT_NOTIFICATION),
             USBEndpointDescriptor_MAXINTERRUPTSIZE_HS),
         0x10                              
-    }
+    },
+    DFU_IF_DESCRIPTORS
 };
 
 /// Qualifier descriptor
@@ -343,7 +348,7 @@ static const CCIDDriverConfigurationDescriptors sOtherSpeedConfigurationFS = {
         sizeof(USBConfigurationDescriptor),
         USBGenericDescriptor_OTHERSPEEDCONFIGURATION,
         sizeof(CCIDDriverConfigurationDescriptors),
-        1, // One interface in this configuration
+        1+DFU_NUM_IF, // One interface in this configuration
         1, // This is configuration #1
         0, // No associated string descriptor
         BOARD_USB_BMATTRIBUTES,
@@ -418,7 +423,8 @@ static const CCIDDriverConfigurationDescriptors sOtherSpeedConfigurationFS = {
         MIN(BOARD_USB_ENDPOINTS_MAXPACKETSIZE(CCID_EPT_NOTIFICATION),
             USBEndpointDescriptor_MAXINTERRUPTSIZE_FS),
         0x10                              
-    }
+    },
+    DFU_IF_DESCRIPTORS
 };
 
 /// OtherSpeed configuration descriptor in High Speed mode
@@ -429,7 +435,7 @@ static const CCIDDriverConfigurationDescriptors sOtherSpeedConfigurationHS = {
         sizeof(USBConfigurationDescriptor),
         USBGenericDescriptor_OTHERSPEEDCONFIGURATION,
         sizeof(CCIDDriverConfigurationDescriptors),
-        1, // One interface in this configuration
+        1+DFU_NUM_IF, // One interface in this configuration
         1, // This is configuration #1
         0, // No associated string descriptor
         BOARD_USB_BMATTRIBUTES,
@@ -504,7 +510,8 @@ static const CCIDDriverConfigurationDescriptors sOtherSpeedConfigurationHS = {
         MIN(BOARD_USB_ENDPOINTS_MAXPACKETSIZE(CCID_EPT_NOTIFICATION),
             USBEndpointDescriptor_MAXINTERRUPTSIZE_HS),
         0x10                              
-    }
+    },
+    DFU_IF_DESCRIPTORS
 };
 #endif
 
@@ -583,7 +590,8 @@ static const unsigned char *stringDescriptors[] = {
     languageIdDescriptor,
     manufacturerDescriptor,
     productDescriptor,
-    serialNumberDescriptor
+    serialNumberDescriptor,
+    DFU_STRING_DESCRIPTORS
 };
 
 
@@ -608,7 +616,7 @@ const USBDDriverDescriptors ccidDriverDescriptors = {
     0, // No other-speed configuration HS
 #endif
     stringDescriptors,
-    4 // Four string descriptors in array
+    4+DFU_NUM_STRINGS // Four string descriptors in array
 };
 
 //------------------------------------------------------------------------------

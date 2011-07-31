@@ -68,7 +68,7 @@ OBJ = obj
 #-------------------------------------------------------------------------------
 
 # Tool suffix when cross-compiling
-CROSS_COMPILE = arm-none-eabi-
+CROSS_COMPILE = arm-elf-
 
 # Compilation tools
 CC = $(CROSS_COMPILE)gcc
@@ -97,7 +97,7 @@ UTILITY = $(AT91LIB)/utility
 USB = $(AT91LIB)/usb
 COMP = $(AT91LIB)/components
 
-VPATH += $(USB)/common/core $(USB)/device/core
+VPATH += $(USB)/common/core $(USB)/device/core $(USB)/device/dfu
 VPATH += $(UTILITY)
 VPATH += $(PERIPH)/dbgu $(PERIPH)/pio $(PERIPH)/pit $(PERIPH)/aic $(PERIPH)/pmc
 VPATH += $(PERIPH)/cp15
@@ -116,7 +116,7 @@ C_OBJECTS += USBDDriverCb_IfSettingChanged.o
 C_OBJECTS += USBSetAddressRequest.o USBGenericDescriptor.o USBInterfaceRequest.o
 C_OBJECTS += USBGenericRequest.o USBGetDescriptorRequest.o 
 C_OBJECTS += USBSetConfigurationRequest.o USBFeatureRequest.o
-C_OBJECTS += USBEndpointDescriptor.o USBConfigurationDescriptor.o
+C_OBJECTS += USBEndpointDescriptor.o USBConfigurationDescriptor.o dfu.o
 C_OBJECTS += led.o math.o stdio.o
 C_OBJECTS += aic.o dbgu.o pio.o pio_it.o pit.o pmc.o cp15.o
 C_OBJECTS += board_memories.o board_lowlevel.o
