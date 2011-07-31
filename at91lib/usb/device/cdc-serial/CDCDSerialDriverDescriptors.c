@@ -38,6 +38,7 @@
 #include <usb/common/core/USBEndpointDescriptor.h>
 #include <usb/common/core/USBStringDescriptor.h>
 #include <usb/common/core/USBGenericRequest.h>
+#include <usb/device/dfu/dfu.h>
 #include <usb/common/cdc/CDCGenericDescriptor.h>
 #include <usb/common/cdc/CDCDeviceDescriptor.h>
 #include <usb/common/cdc/CDCCommunicationInterfaceDescriptor.h>
@@ -104,7 +105,7 @@ typedef struct {
     USBEndpointDescriptor dataOut;
     /// Data IN endpoint descriptor.
     USBEndpointDescriptor dataIn;
-
+    DFU_IF_DESCRIPTORS_STRUCT
 } __attribute__ ((packed)) CDCDSerialDriverConfigurationDescriptors;
 
 //------------------------------------------------------------------------------
@@ -156,7 +157,7 @@ const CDCDSerialDriverConfigurationDescriptors configurationDescriptors = {
         sizeof(USBConfigurationDescriptor),
         USBGenericDescriptor_CONFIGURATION,
         sizeof(CDCDSerialDriverConfigurationDescriptors),
-        2, // There are two interfaces in this configuration
+        2+DFU_NUM_IF, // There are two interfaces in this configuration
         1, // This is configuration #1
         0, // No string descriptor for this configuration
         BOARD_USB_BMATTRIBUTES,
@@ -221,7 +222,7 @@ const CDCDSerialDriverConfigurationDescriptors configurationDescriptors = {
         USBGenericDescriptor_INTERFACE,
         1, // This is interface #1
         0, // This is alternate setting #0 for this interface
-        2, // This interface uses 2 endpoints
+        2+DFU_NUM_IF, // This interface uses 2 endpoints
         CDCDataInterfaceDescriptor_CLASS,
         CDCDataInterfaceDescriptor_SUBCLASS,
         CDCDataInterfaceDescriptor_NOPROTOCOL,
@@ -249,6 +250,7 @@ const CDCDSerialDriverConfigurationDescriptors configurationDescriptors = {
             USBEndpointDescriptor_MAXBULKSIZE_FS),
         0 // Must be 0 for full-speed bulk endpoints
     },
+    DFU_IF_DESCRIPTORS
 };
 
 /// Language ID string descriptor
@@ -268,7 +270,7 @@ const CDCDSerialDriverConfigurationDescriptors otherSpeedDescriptorsFS = {
         sizeof(USBConfigurationDescriptor),
         USBGenericDescriptor_OTHERSPEEDCONFIGURATION,
         sizeof(CDCDSerialDriverConfigurationDescriptors),
-        2, // There are two interfaces in this configuration
+        2+DFU_NUM_IF, // There are two interfaces in this configuration
         1, // This is configuration #1
         0, // No string descriptor for this configuration
         BOARD_USB_BMATTRIBUTES,
@@ -361,6 +363,7 @@ const CDCDSerialDriverConfigurationDescriptors otherSpeedDescriptorsFS = {
             USBEndpointDescriptor_MAXBULKSIZE_HS),
         0 // Must be 0 for full-speed bulk endpoints
     },
+    DFU_IF_DESCRIPTORS
 };
 
 
@@ -372,7 +375,7 @@ const CDCDSerialDriverConfigurationDescriptors configurationDescriptorsHS = {
         sizeof(USBConfigurationDescriptor),
         USBGenericDescriptor_CONFIGURATION,
         sizeof(CDCDSerialDriverConfigurationDescriptors),
-        2, // There are two interfaces in this configuration
+        2+DFU_NUM_IF, // There are two interfaces in this configuration
         1, // This is configuration #1
         0, // No string descriptor for this configuration
         BOARD_USB_BMATTRIBUTES,
@@ -465,6 +468,7 @@ const CDCDSerialDriverConfigurationDescriptors configurationDescriptorsHS = {
             USBEndpointDescriptor_MAXBULKSIZE_HS),
         0 // Must be 0 for full-speed bulk endpoints
     },
+    DFU_IF_DESCRIPTORS
 };
 
 /// Other-speed configuration descriptor (when in high-speed).
@@ -475,7 +479,7 @@ const CDCDSerialDriverConfigurationDescriptors otherSpeedDescriptorsHS = {
         sizeof(USBConfigurationDescriptor),
         USBGenericDescriptor_OTHERSPEEDCONFIGURATION,
         sizeof(CDCDSerialDriverConfigurationDescriptors),
-        2, // There are two interfaces in this configuration
+        2+DFU_NUM_IF, // There are two interfaces in this configuration
         1, // This is configuration #1
         0, // No string descriptor for this configuration
         BOARD_USB_BMATTRIBUTES,
@@ -568,6 +572,7 @@ const CDCDSerialDriverConfigurationDescriptors otherSpeedDescriptorsHS = {
             USBEndpointDescriptor_MAXBULKSIZE_FS),
         0 // Must be 0 for full-speed bulk endpoints
     },
+    DFU_IF_DESCRIPTORS
 };
 #endif
 
@@ -596,6 +601,7 @@ const unsigned char *stringDescriptors[] = {
 
     languageIdStringDescriptor,
     productStringDescriptor,
+    DFU_STRING_DESCRIPTORS
 };
 
 /// List of standard descriptors for the serial driver.
@@ -620,6 +626,6 @@ USBDDriverDescriptors cdcdSerialDriverDescriptors = {
 
 #endif
     stringDescriptors,
-    2 // 2 string descriptors in list
+    2+DFU_NUM_STRINGS // 2 string descriptors in list
 };
 

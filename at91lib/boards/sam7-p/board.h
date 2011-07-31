@@ -256,6 +256,8 @@
 /// This page lists the definitions related to external on-board components
 /// located in the board.h file for the SAM7S-EK.
 /// 
-//
+
+#define BOARD_USB_DFU
+
 #endif //#ifndef BOARD_H
 

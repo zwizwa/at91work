@@ -96,6 +96,7 @@ BOARDS = $(AT91LIB)/boards
 
 VPATH += $(USB)/device/cdc-serial $(USB)/device/core $(USB)/common/core
 VPATH += $(USB)/common/cdc
+VPATH += $(USB)/device/dfu
 VPATH += $(UTILITY)
 VPATH += $(PERIPH)/dbgu $(PERIPH)/aic $(PERIPH)/usart $(PERIPH)/pio $(PERIPH)/pmc
 VPATH += $(PERIPH)/cp15
@@ -106,7 +107,7 @@ C_OBJECTS = main.o
 C_OBJECTS += CDCDSerialDriver.o CDCDSerialDriverDescriptors.o
 C_OBJECTS += CDCSetControlLineStateRequest.o CDCLineCoding.o
 C_OBJECTS += USBD_OTGHS.o USBD_UDP.o USBD_UDPHS.o USBDDriver.o
-C_OBJECTS += USBDCallbacks_Initialized.o
+C_OBJECTS += USBDCallbacks_Initialized.o dfu.o
 C_OBJECTS += USBDCallbacks_Reset.o
 #C_OBJECTS += USBDCallbacks_Resumed.o
 #C_OBJECTS += USBDCallbacks_Suspended.o
