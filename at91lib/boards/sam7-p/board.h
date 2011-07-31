@@ -93,7 +93,7 @@
 // Board
 //------------------------------------------------------------------------------
 /// String containing the name of the board.
-#define BOARD_NAME      "AT91SAM7S-EK"
+#define BOARD_NAME      "Olimex SAM7S-Pxxx"
 /// Board definition.
 #define at91sam7sek
 /// Family definition.
@@ -145,8 +145,8 @@
 #define BOARD_USB_ENDPOINTS_BANKS(i)            (((i == 0) || (i == 3)) ? 1 : 2)
 
 /// USB attributes configuration descriptor (bus or self powered, remote wakeup)
-#define BOARD_USB_BMATTRIBUTES                  USBConfigurationDescriptor_SELFPOWERED_NORWAKEUP
-//#define BOARD_USB_BMATTRIBUTES                  USBConfigurationDescriptor_BUSPOWERED_NORWAKEUP
+//#define BOARD_USB_BMATTRIBUTES                  USBConfigurationDescriptor_SELFPOWERED_NORWAKEUP
+#define BOARD_USB_BMATTRIBUTES                  USBConfigurationDescriptor_BUSPOWERED_NORWAKEUP
 //#define BOARD_USB_BMATTRIBUTES                  USBConfigurationDescriptor_SELFPOWERED_RWAKEUP
 //------------------------------------------------------------------------------
 
@@ -156,39 +156,23 @@
 /// DBGU pins definition. Contains DRXD (PA9) and DTXD (PA10).
 #define PINS_DBGU  {0x00000600, AT91C_BASE_PIOA, AT91C_ID_PIOA, PIO_PERIPH_A, PIO_DEFAULT}
 
-/// LED #0 pin definition (PA0).
-#define PIN_LED_DS1   {1 << 0, AT91C_BASE_PIOA, AT91C_ID_PIOA, PIO_OUTPUT_1, PIO_DEFAULT}
-/// LED #1 pin definition (PA1).
-#define PIN_LED_DS2   {1 << 1, AT91C_BASE_PIOA, AT91C_ID_PIOA, PIO_OUTPUT_1, PIO_DEFAULT}
-/// LED #2 pin definition (PA2).
-#define PIN_LED_DS3   {1 << 2, AT91C_BASE_PIOA, AT91C_ID_PIOA, PIO_OUTPUT_1, PIO_DEFAULT}
-/// LED #3 pin definition (PA3).
-#define PIN_LED_DS4   {1 << 3, AT91C_BASE_PIOA, AT91C_ID_PIOA, PIO_OUTPUT_1, PIO_DEFAULT}
+/// LED #0 pin definition (PA18).
+#define PIN_LED_DS1   {1 << 18, AT91C_BASE_PIOA, AT91C_ID_PIOA, PIO_OUTPUT_1, PIO_DEFAULT}
+/// LED #1 pin definition (PA17).
+#define PIN_LED_DS2   {1 << 17, AT91C_BASE_PIOA, AT91C_ID_PIOA, PIO_OUTPUT_1, PIO_DEFAULT}
 /// List of the four LED pin definitions (PA0, PA1, PA2 & PA3)
-#define PINS_LEDS   PIN_LED_DS1, PIN_LED_DS2, PIN_LED_DS3, PIN_LED_DS4
+#define PINS_LEDS   PIN_LED_DS1, PIN_LED_DS2
 
 /// Push button #0 definition (PA19).
 #define PIN_PUSHBUTTON_1    {1 << 19, AT91C_BASE_PIOA, AT91C_ID_PIOA, PIO_INPUT, PIO_DEGLITCH | PIO_PULLUP}
 /// Push button #1 definition (PA20).
 #define PIN_PUSHBUTTON_2    {1 << 20, AT91C_BASE_PIOA, AT91C_ID_PIOA, PIO_INPUT, PIO_DEGLITCH | PIO_PULLUP}
-/// Push button #2 definition (PA15).
-#define PIN_PUSHBUTTON_3    {1 << 15, AT91C_BASE_PIOA, AT91C_ID_PIOA, PIO_INPUT, PIO_DEGLITCH | PIO_PULLUP}
-/// Push button #3 definition (PA14).
-#define PIN_PUSHBUTTON_4    {1 << 14, AT91C_BASE_PIOA, AT91C_ID_PIOA, PIO_INPUT, PIO_DEGLITCH | PIO_PULLUP}
-/// List of all push button definitions (PA19, PA20, PA15 & PA14).
-#define PINS_PUSHBUTTONS    PIN_PUSHBUTTON_1, PIN_PUSHBUTTON_2, PIN_PUSHBUTTON_3, PIN_PUSHBUTTON_4
+/// List of all push button definitions (PA19, PA20).
+#define PINS_PUSHBUTTONS    PIN_PUSHBUTTON_1, PIN_PUSHBUTTON_2
 /// Push button #1 index.
 #define PUSHBUTTON_BP1      0
 /// Push button #2 index.
 #define PUSHBUTTON_BP2      1
-/// Push button #1 index.
-#define PUSHBUTTON_BP3      2
-/// Push button #2 index.
-#define PUSHBUTTON_BP4      3
-/// Simulated joystick LEFT index.
-#define JOYSTICK_LEFT       0
-/// Simulated joystick RIGHT index.
-#define JOYSTICK_RIGHT      1
 
 /// USART0 TXD pin definition (PA5).
 #define PIN_USART0_RXD  {1 << 5, AT91C_BASE_PIOA, AT91C_ID_PIOA, PIO_PERIPH_A, PIO_DEFAULT}
@@ -211,12 +195,6 @@
 #define PINS_SPI       PIN_SPI_MISO, PIN_SPI_MOSI, PIN_SPI_SPCK
 /// SPI chip select 0 pin definition (PA11).
 #define PIN_SPI_NPCS0  {1 << 11, AT91C_BASE_PIOA, AT91C_ID_PIOA, PIO_PERIPH_A, PIO_DEFAULT}
-/// SPI chip select 1
-#define PIN_SPI_NPCS1  {1 << 31, AT91C_BASE_PIOA, AT91C_ID_PIOA, PIO_PERIPH_A, PIO_DEFAULT}
-/// SPI chip select 2
-#define PIN_SPI_NPCS2  {1 << 10, AT91C_BASE_PIOA, AT91C_ID_PIOA, PIO_PERIPH_B, PIO_DEFAULT}
-/// SPI chip select 3
-#define PIN_SPI_NPCS3  {1 <<  3, AT91C_BASE_PIOA, AT91C_ID_PIOA, PIO_PERIPH_B, PIO_DEFAULT}
 
 /// PWMC PWM0 pin definition (PA0).
 #define PIN_PWMC_PWM0  {1 << 0, AT91C_BASE_PIOA, AT91C_ID_PIOA, PIO_PERIPH_A, PIO_DEFAULT}
@@ -237,17 +215,6 @@
 /// TWI pins definition. Contains TWD (PA3) and TWCK (PA4).
 #define PINS_TWI  {0x00000018, AT91C_BASE_PIOA, AT91C_ID_PIOA, PIO_PERIPH_A, PIO_DEFAULT}
 
-/// ADC_AD0 pin definition.
-#define PIN_ADC_AD0 {1 << 17, AT91C_BASE_PIOA, AT91C_ID_PIOA, PIO_INPUT, PIO_DEFAULT}
-/// ADC_AD1 pin definition.
-#define PIN_ADC_AD1 {1 << 18, AT91C_BASE_PIOA, AT91C_ID_PIOA, PIO_INPUT, PIO_DEFAULT}
-/// ADC_AD2 pin definition. (mixed with PIN_PUSHBUTTON_1)
-#define PIN_ADC_AD2 {1 << 19, AT91C_BASE_PIOA, AT91C_ID_PIOA, PIO_INPUT, PIO_DEFAULT}
-/// ADC_AD3 pin definition. (mixed with PIN_PUSHBUTTON_2)
-#define PIN_ADC_AD3 {1 << 20, AT91C_BASE_PIOA, AT91C_ID_PIOA, PIO_INPUT, PIO_DEFAULT}
-/// Pins ADC
-#define PINS_ADC PIN_ADC_AD0, PIN_ADC_AD1, PIN_ADC_AD2, PIN_ADC_AD3
-
 /// USB VBus monitoring pin definition (PA13).
 #define PIN_USB_VBUS    {1 << 13, AT91C_BASE_PIOA, AT91C_ID_PIOA, PIO_INPUT, PIO_DEFAULT}
 /// USB pull-up control pin definition (PA16).
@@ -266,7 +233,7 @@
 /// Identifier of the SPI peripheral connected to the SD card.
 #define BOARD_SD_SPI_ID     AT91C_ID_SPI
 /// List of pins to configure to access the SD card
-#define BOARD_SD_SPI_PINS   PINS_SPI, PIN_SPI_NPCS1
+#define BOARD_SD_SPI_PINS   PINS_SPI, PIN_SPI_NPCS0
 /// NPCS number
 #define BOARD_SD_NPCS       1
 
@@ -284,18 +251,6 @@
 /// This page lists the definitions related to external on-board components
 /// located in the board.h file for the SAM7S-EK.
 /// 
-/// !ISO7816
-/// - PIN_SMARTCARD_CONNECT
-/// - PIN_ISO7816_RSTMC
-/// - PINS_ISO7816
-
-/// Smartcard detection pin
-#define PIN_SMARTCARD_CONNECT   {1 << 5, AT91C_BASE_PIOA, AT91C_ID_PIOA, PIO_INPUT, PIO_DEFAULT}
-/// PIN used for reset the smartcard
-#define PIN_ISO7816_RSTMC       {1 << 7, AT91C_BASE_PIOA, AT91C_ID_PIOA, PIO_OUTPUT_0, PIO_DEFAULT}
-/// Pins used for connect the smartcard
-#define PINS_ISO7816            PIN_USART0_TXD, PIN_USART0_SCK, PIN_ISO7816_RSTMC
-//------------------------------------------------------------------------------
-
+//
 #endif //#ifndef BOARD_H
 
