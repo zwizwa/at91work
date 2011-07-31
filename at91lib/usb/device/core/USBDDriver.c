@@ -49,6 +49,35 @@
 
 #include <string.h>
 
+static const USBConfigurationDescriptor *GetCurConfigDesc(USBDDriver *pDriver)
+{
+	unsigned char cfgidx = pDriver->cfgnum;
+
+	if (cfgidx != 0)
+		cfgidx -= 1;
+
+	// Use different descriptor depending on device speed
+	if (USBD_IsHighSpeed())
+		return &pDriver->pDescriptors->pHsConfiguration[cfgidx];
+	else
+		return &pDriver->pDescriptors->pFsConfiguration[cfgidx];
+}
+
+static const USBConfigurationDescriptor *GetCurOtherSpeedDesc(USBDDriver *pDriver)
+{
+	unsigned char cfgidx = pDriver->cfgnum;
+
+	if (cfgidx != 0)
+		cfgidx -= 1;
+
+	// Use different descriptor depending on device speed
+	if (USBD_IsHighSpeed())
+		return &pDriver->pDescriptors->pHsOtherSpeed[cfgidx];
+	else
+		return &pDriver->pDescriptors->pFsOtherSpeed[cfgidx];
+}
+
+
 //------------------------------------------------------------------------------
 //      Local functions
 //------------------------------------------------------------------------------
@@ -64,19 +93,11 @@ static void SetConfiguration(USBDDriver *pDriver, unsigned char cfgnum)
     USBEndpointDescriptor *pEndpoints[BOARD_USB_NUMENDPOINTS+1];
     const USBConfigurationDescriptor *pConfiguration;
 
-    // Use different descriptor depending on device speed
-    if (USBD_IsHighSpeed()) {
-
-        pConfiguration = pDriver->pDescriptors->pHsConfiguration;
-    }
-    else {
-
-        pConfiguration = pDriver->pDescriptors->pFsConfiguration;
-    }
-
     // Set & save the desired configuration
     USBD_SetConfiguration(cfgnum);
     pDriver->cfgnum = cfgnum;
+
+    pConfiguration = GetCurConfigDesc(pDriver);
 
     // If the configuration is not 0, configure endpoints
     if (cfgnum != 0) {
@@ -121,15 +142,7 @@ static void GetDeviceStatus(const USBDDriver *pDriver)
     unsigned short data = 0;
     const USBConfigurationDescriptor *pConfiguration;
 
-    // Use different configuration depending on device speed
-    if (USBD_IsHighSpeed()) {
-
-        pConfiguration = pDriver->pDescriptors->pHsConfiguration;
-    }
-    else {
-
-        pConfiguration = pDriver->pDescriptors->pFsConfiguration;
-    }
+    pConfiguration = GetCurConfigDesc(pDriver);
 
     // Check current configuration for power mode (if device is configured)
     if (pDriver->cfgnum != 0) {
@@ -204,18 +217,16 @@ static void GetDescriptor(
 
         TRACE_DEBUG("HS ");
         pDevice = pDriver->pDescriptors->pHsDevice;
-        pConfiguration = pDriver->pDescriptors->pHsConfiguration;
         pQualifier = pDriver->pDescriptors->pHsQualifier;
-        pOtherSpeed = pDriver->pDescriptors->pHsOtherSpeed;
     }
     else {
 
         TRACE_DEBUG("FS ");
         pDevice = pDriver->pDescriptors->pFsDevice;
-        pConfiguration = pDriver->pDescriptors->pFsConfiguration;
         pQualifier = pDriver->pDescriptors->pFsQualifier;
-        pOtherSpeed = pDriver->pDescriptors->pFsOtherSpeed;
     }
+    pConfiguration = GetCurConfigDesc(pDriver);
+    pOtherSpeed = GetCurOtherSpeedDesc(pDriver);
 
     // Check the descriptor type
     switch (type) {
