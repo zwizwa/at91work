@@ -222,7 +222,7 @@ const CDCDSerialDriverConfigurationDescriptors configurationDescriptors = {
         USBGenericDescriptor_INTERFACE,
         1, // This is interface #1
         0, // This is alternate setting #0 for this interface
-        2+DFU_NUM_IF, // This interface uses 2 endpoints
+        2, // This interface uses 2 endpoints
         CDCDataInterfaceDescriptor_CLASS,
         CDCDataInterfaceDescriptor_SUBCLASS,
         CDCDataInterfaceDescriptor_NOPROTOCOL,
