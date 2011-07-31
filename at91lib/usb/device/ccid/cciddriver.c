@@ -607,11 +607,11 @@ const USBDDriverDescriptors ccidDriverDescriptors = {
     { (USBConfigurationDescriptor *) &sOtherSpeedConfigurationHS },
 #else
     0, // No qualifier descriptor FS
-    0, // No other-speed configuration FS
+    { 0 }, // No other-speed configuration FS
     0, // No device descriptor HS
-    0, // No configuration HS
+    { 0 }, // No configuration HS
     0, // No qualifier descriptor HS
-    0, // No other-speed configuration HS
+    { 0 }, // No other-speed configuration HS
 #endif
     stringDescriptors,
     4+DFU_NUM_STRINGS // Four string descriptors in array

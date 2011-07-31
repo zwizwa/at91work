@@ -893,7 +893,7 @@ const USBDDriverDescriptors compositedDriverDescriptors = {
     &qualifierDescriptor,
     { (const USBConfigurationDescriptor *) &configurationDescriptors },
 #else
-    0, 0, 0, 0, 0, 0,
+    0, { 0 }, 0, { 0 }, 0, { 0 },
 #endif
     stringDescriptors,
     4 // Number of string descriptors

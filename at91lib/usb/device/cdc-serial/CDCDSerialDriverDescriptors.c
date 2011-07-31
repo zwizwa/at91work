@@ -618,11 +618,11 @@ USBDDriverDescriptors cdcdSerialDriverDescriptors = {
     { (USBConfigurationDescriptor *) &(otherSpeedDescriptorsHS) },
 #else
     0, // No full-speed device qualifier descriptor
-    0, // No full-speed other speed configuration
+    { 0 }, // No full-speed other speed configuration
     0, // No high-speed device descriptor
-    0, // No high-speed configuration descriptor
+    { 0 }, // No high-speed configuration descriptor
     0, // No high-speed device qualifier descriptor
-    0, // No high-speed other speed configuration descriptor
+    { 0 }, // No high-speed other speed configuration descriptor
 
 #endif
     stringDescriptors,
