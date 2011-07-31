@@ -49,12 +49,16 @@
 
 #include <string.h>
 
-static const USBConfigurationDescriptor *GetCurConfigDesc(USBDDriver *pDriver)
+static const USBConfigurationDescriptor *
+GetConfigDesc(const USBDDriver *pDriver, unsigned char cfgnum)
 {
-	unsigned char cfgidx = pDriver->cfgnum;
+	unsigned char cfgidx = cfgnum;
 
 	if (cfgidx != 0)
 		cfgidx -= 1;
+
+	if (cfgidx >= USBD_NUM_CONFIGS)
+		return NULL;
 
 	// Use different descriptor depending on device speed
 	if (USBD_IsHighSpeed())
@@ -63,12 +67,16 @@ static const USBConfigurationDescriptor *GetCurConfigDesc(USBDDriver *pDriver)
 		return pDriver->pDescriptors->pFsConfiguration[cfgidx];
 }
 
-static const USBConfigurationDescriptor *GetCurOtherSpeedDesc(USBDDriver *pDriver)
+static const USBConfigurationDescriptor *
+GetOtherSpeedDesc(const USBDDriver *pDriver, unsigned char cfgnum)
 {
-	unsigned char cfgidx = pDriver->cfgnum;
+	unsigned char cfgidx = cfgnum;
 
 	if (cfgidx != 0)
 		cfgidx -= 1;
+
+	if (cfgidx >= USBD_NUM_CONFIGS)
+		return NULL;
 
 	// Use different descriptor depending on device speed
 	if (USBD_IsHighSpeed())
@@ -97,7 +105,7 @@ static void SetConfiguration(USBDDriver *pDriver, unsigned char cfgnum)
     USBD_SetConfiguration(cfgnum);
     pDriver->cfgnum = cfgnum;
 
-    pConfiguration = GetCurConfigDesc(pDriver);
+    pConfiguration = GetConfigDesc(pDriver, cfgnum);
 
     // If the configuration is not 0, configure endpoints
     if (cfgnum != 0) {
@@ -142,7 +150,7 @@ static void GetDeviceStatus(const USBDDriver *pDriver)
     unsigned short data = 0;
     const USBConfigurationDescriptor *pConfiguration;
 
-    pConfiguration = GetCurConfigDesc(pDriver);
+    pConfiguration = GetConfigDesc(pDriver, pDriver->cfgnum);
 
     // Check current configuration for power mode (if device is configured)
     if (pDriver->cfgnum != 0) {
@@ -225,8 +233,6 @@ static void GetDescriptor(
         pDevice = pDriver->pDescriptors->pFsDevice;
         pQualifier = pDriver->pDescriptors->pFsQualifier;
     }
-    pConfiguration = GetCurConfigDesc(pDriver);
-    pOtherSpeed = GetCurOtherSpeedDesc(pDriver);
 
     // Check the descriptor type
     switch (type) {
@@ -243,7 +249,8 @@ static void GetDescriptor(
             break;
 
         case USBGenericDescriptor_CONFIGURATION:
-            TRACE_INFO_WP("Cfg ");
+            TRACE_INFO_WP("Cfg%u ", index);
+	    pConfiguration = GetConfigDesc(pDriver, index);
 
             // Adjust length and send descriptor
             if (length > USBConfigurationDescriptor_GetTotalLength(pConfiguration)) {
@@ -273,7 +280,8 @@ static void GetDescriptor(
             break;
 
         case USBGenericDescriptor_OTHERSPEEDCONFIGURATION:
-            TRACE_INFO_WP("OSC ");
+            TRACE_INFO_WP("OSC%u ", index);
+	    pOtherSpeed = GetOtherSpeedDesc(pDriver, index);
 
             // Check if descriptor exists
             if (!pOtherSpeed) {
