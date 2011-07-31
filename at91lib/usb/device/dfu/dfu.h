@@ -15,6 +15,10 @@ struct USBStringDescriptor {
 #ifdef BOARD_USB_DFU
 
 #define DFU_NUM_IF	3
+
+#define DFU_IF_DESCRIPTORS_STRUCT		\
+	USBInterfaceDescriptor	dfu_interface[DFU_NUM_IF];
+
 #define DFU_IF_DESCRIPTORS			{ 				\
 	{									\
 		.bLength 		= sizeof(USBInterfaceDescriptor),	\
@@ -65,6 +69,7 @@ extern const struct USBStringDescriptor USBDFU_string3;
 
 /* no DFU bootloader is being used */
 #define DFU_NUM_IF	0
+#define DFU_IF_DESCRIPTORS_STRUCT
 #define DFU_IF_DESCRIPTORS
 
 #define DFU_NUM_STRINGS	0

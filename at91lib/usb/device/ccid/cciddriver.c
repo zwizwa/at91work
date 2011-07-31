@@ -90,9 +90,7 @@ typedef struct {
     USBEndpointDescriptor      bulkIn;
     /// Interrupt OUT endpoint descriptor
     USBEndpointDescriptor      interruptIn;
-#ifdef BOARD_USB_DFU
-    USBInterfaceDescriptor	dfu_interface[DFU_NUM_IF];
-#endif
+    DFU_IF_DESCRIPTORS_STRUCT
 } __attribute__ ((packed)) CCIDDriverConfigurationDescriptors;
 
 //------------------------------------------------------------------------------
