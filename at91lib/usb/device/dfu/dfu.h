@@ -1,6 +1,7 @@
 #ifndef _USB_DFU_DESC_H
 #define _USB_DFU_DESC_H
 
+#include <board.h>
 #include <usb/common/core/USBGenericDescriptor.h>
 
 #define CONFIG_DFU_NUM_APP_IF	1
