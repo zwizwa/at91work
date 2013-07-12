@@ -197,6 +197,16 @@ unsigned short ISO7816_XfrBlockTPDU_T0(const unsigned char *pAPDU,
     unsigned char procByte;
     unsigned char cmdCase;
 
+    // Hack: CLA==FF is used for phone-side access.
+    if (pAPDU[0] == 0xFF) {
+        unsigned short i = 0;
+        pMessage[i++] = 1;
+        pMessage[i++] = 2;
+        pMessage[i++] = 3;
+        pMessage[i++] = 4;
+        return i;
+    }
+
     TRACE_DEBUG("pAPDU[0]=0x%X\n\r",pAPDU[0]);
     TRACE_DEBUG("pAPDU[1]=0x%X\n\r",pAPDU[1]);
     TRACE_DEBUG("pAPDU[2]=0x%X\n\r",pAPDU[2]);
