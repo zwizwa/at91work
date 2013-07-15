@@ -28,4 +28,7 @@
 
 # Defines which are the available memory targets for the AT91SAM7S-EK board.
 
-MEMORIES = flash_dfu flash sram
+# MEMORIES = flash_dfu flash sram
+
+# For dev: build only one image.
+MEMORIES = flash_dfu

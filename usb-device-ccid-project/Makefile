@@ -34,7 +34,7 @@
 
 # Chip & board used for compilation
 # (can be overriden by adding CHIP=chip and BOARD=board to the command-line)
-CHIP  = at91sam7s128
+CHIP  = at91sam7s256
 BOARD = simtrace
 
 # Trace level used for compilation
@@ -48,7 +48,8 @@ BOARD = simtrace
 TRACE_LEVEL = 3
 
 # Optimization level, put in comment for debugging
-OPTIMIZATION = -Os
+# OPTIMIZATION = -Os
+OPTIMIZATION = -O0 -Wno-unused-but-set-variable
 
 # AT91 library directory
 AT91LIB = ../at91lib
@@ -68,7 +69,7 @@ OBJ = obj
 #-------------------------------------------------------------------------------
 
 # Tool suffix when cross-compiling
-CROSS_COMPILE = arm-elf-
+CROSS_COMPILE = arm-none-eabi-
 
 # Compilation tools
 CC = $(CROSS_COMPILE)gcc

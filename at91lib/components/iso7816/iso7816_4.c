@@ -179,6 +179,27 @@ void ISO7816_IccPowerOff( void )
     PIO_Clear(&st_pinIso7816RstMC);
 }
 
+
+unsigned short ISO7816_FF_TPDU_T0(const unsigned char *pAPDU,
+                                  unsigned char *pMessage,
+                                  unsigned short wLength )
+{
+    TRACE_DEBUG("CLA=FF\n\r");
+    // CLA 0xFF
+    // INS ??
+    // P1  ??
+    // P2  ??
+    // P3  Length
+
+    unsigned short i = 0;
+    pMessage[i++] = 1;
+    pMessage[i++] = 2;
+    pMessage[i++] = 3;
+    pMessage[i++] = 4;
+    return i;
+}
+
+
 //------------------------------------------------------------------------------
 /// Transfert Block TPDU T=0
 /// \param pAPDU    APDU buffer
@@ -198,14 +219,7 @@ unsigned short ISO7816_XfrBlockTPDU_T0(const unsigned char *pAPDU,
     unsigned char cmdCase;
 
     // Hack: CLA==FF is used for phone-side access.
-    if (pAPDU[0] == 0xFF) {
-        unsigned short i = 0;
-        pMessage[i++] = 1;
-        pMessage[i++] = 2;
-        pMessage[i++] = 3;
-        pMessage[i++] = 4;
-        return i;
-    }
+    if (pAPDU[0] == 0xFF) return ISO7816_FF_TPDU_T0(pAPDU, pMessage, wLength);
 
     TRACE_DEBUG("pAPDU[0]=0x%X\n\r",pAPDU[0]);
     TRACE_DEBUG("pAPDU[1]=0x%X\n\r",pAPDU[1]);

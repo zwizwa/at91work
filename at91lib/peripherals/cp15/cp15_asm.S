@@ -31,7 +31,9 @@
 //         Headers
 //------------------------------------------------------------------------------
 
+#ifndef __ASSEMBLY__        
 #define __ASSEMBLY__
+#endif
 #include "board.h"
 
 #ifdef CP15_PRESENT
