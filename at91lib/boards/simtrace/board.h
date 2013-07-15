@@ -240,7 +240,9 @@
 #define PINS_ISO7816            PIN_USART0_TXD, PIN_USART0_SCK, PIN_ISO7816_RSTMC
 //------------------------------------------------------------------------------
 
-#define BOARD_USB_DFU
+
+// disabled: pcscd doesn't like this
+//#define BOARD_USB_DFU
 
 #endif //#ifndef BOARD_H
 
