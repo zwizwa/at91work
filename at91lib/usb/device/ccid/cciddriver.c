@@ -942,13 +942,14 @@ static void PCtoRDRXfrBlock( void )
                         TRACE_INFO("Not supported T=1\n\r");
                     }
                     else {
-                        TRACE_INFO("Not supported\n\r");
+                        TRACE_INFO("Not supported PROTOCOL %02x\n\r",
+                                   ccidDriver.ProtocolDataStructure[1]);
                     }
                 }
                 break;
 
             case CCID_FEATURES_EXC_APDU:
-                TRACE_INFO("Not supported\n\r");
+                TRACE_INFO("Not supported CCID_FEATURES_EXC_APDU\n\r");
                 break;
 
             default:
@@ -1336,13 +1337,13 @@ static void CCID_RequestHandler(const USBGenericRequest *pRequest)
                 break;
 
             case CCIDGenericRequest_GET_CLOCK_FREQUENCIES:
-                TRACE_DEBUG("Not supported\n\r");
+                TRACE_DEBUG("Not supported: GET_CLOCK_FREQUENCIES\n\r");
                 // A CCID with bNumClockSupported equal to 00h does not have 
                 // to support this request
                 break;
 
             case CCIDGenericRequest_GET_DATA_RATES:
-                TRACE_DEBUG("Not supported\n\r");
+                TRACE_DEBUG("Not supported: GET_DATA_RATES\n\r");
                 // A CCID with bNumDataRatesSupported equal to 00h does not have 
                 // to support this request.
                 break;

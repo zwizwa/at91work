@@ -45,7 +45,7 @@ MEMORY
 SECTIONS
 {
     . = 0x000000000;
-    .fixed 0x00104000: AT ( 0x00000000 )
+    .fixed 0x00104000:
     {
         . = ALIGN(4);
         _sfixed = .;
@@ -55,7 +55,7 @@ SECTIONS
         _efixed = .;
     } >flash
 
-    .relocate 0x00200028: AT ( SIZEOF(.fixed) )
+    .relocate 0x00200028:
     {
         . = ALIGN(4);
         _srelocate = .;
@@ -64,7 +64,7 @@ SECTIONS
         *(.data)
         . = ALIGN(4);
         _erelocate = .;
-    } >sram
+    } >sram AT >flash
 
     .bss (NOLOAD) : {
         _szero = .;
