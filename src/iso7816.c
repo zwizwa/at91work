@@ -33,11 +33,18 @@
 #include <stdint.h>
 #include <utility/trace.h>
 
+
+// Pins: as annotated on schematics
+#define RST_PHONE  AT91C_PIO_PA24
+#define VCC_PHONE  AT91C_PIO_PA25
+#define  IO_PHONE  AT91C_PA22_TXD1
+#define CLK_PHONE  AT91C_PA23_SCK1
+
 enum {
     PHONE_INVALID = 0,
     PHONE_RX,
     PHONE_TX,
-} phone_state;
+} phone_state = PHONE_INVALID;
 
 // phone side usart.
 static AT91S_USART * const phone_usart = AT91C_BASE_US1;
@@ -47,9 +54,13 @@ uint32_t phone_tx(uint8_t c) {
     if (phone_state != PHONE_TX) {
         phone_usart->US_CR = AT91C_US_RSTSTA | AT91C_US_RSTIT | AT91C_US_RSTNACK;
         phone_state = PHONE_TX;
+        TRACE_DEBUG("PHONE_TX\n\r");
     }
     /* Flush */
-    while((phone_usart->US_CSR & AT91C_US_TXRDY) == 0) {}
+    while((phone_usart->US_CSR & AT91C_US_TXRDY) == 0) {
+        TRACE_DEBUG("!TXRDY\n\r");
+    }
+    TRACE_DEBUG("TXRDY\n\r");
     /* Send */
     phone_usart->US_THR = c;
     /* Check */
@@ -88,11 +99,12 @@ void phone_init(void) {
     /* Enable usart peripheral clock */
     AT91C_BASE_PMC->PMC_PCER = 1 << AT91C_ID_US0;
 
-    /* I/O and CLK controlled by peripheral A (Table 10-3) */
-    AT91C_BASE_PIOA->PIO_ASR = AT91C_PA22_TXD1 | AT91C_PA23_SCK1;
-    /* nRST is input */
-    AT91C_BASE_PIOA->PIO_ODR = AT91C_PIO_PA24;
-    AT91C_BASE_PIOA->PIO_PER = AT91C_PIO_PA24;
+    /* PHONE I/O and CLK controlled by peripheral A (Table 10-3) */
+    AT91C_BASE_PIOA->PIO_ASR = IO_PHONE | CLK_PHONE;
+
+    /* PHONE RST and VCC are input.  This pin is tied to 3V3,100K.  */
+    AT91C_BASE_PIOA->PIO_ODR = RST_PHONE | VCC_PHONE;
+    AT91C_BASE_PIOA->PIO_PER = RST_PHONE | VCC_PHONE;
 
     /* Reset and disable receiver & transmitter */
     phone_usart->US_CR =
@@ -108,26 +120,35 @@ void phone_init(void) {
         | AT91C_US_CHRL_8_BITS
         | AT91C_US_PAR_EVEN
         | AT91C_US_NBSTOP_1_BIT
+        | AT91C_US_CKLO
+        | AT91C_US_INACK
         | (3<<24);
 
     /* In 7816 mode, Baud Rate = Selected Clock / CD / FI_DI_RATIO
        Since we use external clock, CD=1 */
     phone_usart->US_BRGR = 1;
 
-    /* FIXME: Set ATR clock div to 372 */
+    /* Set ATR clock div to 372 */
     phone_usart->US_FIDI = 372 & 0x3FF;
 
+    /* Enable TX */
+    phone_usart->US_CR = AT91C_US_TXEN | AT91C_US_RXDIS;
+
     uint32_t prev = 0;
-    while(1) {
-        uint32_t cur = AT91C_BASE_PIOA->PIO_PDSR & AT91C_PIO_PA24;
+    while(0) {
+        uint32_t mask = RST_PHONE | VCC_PHONE;
+        // uint32_t mask = CLK_PHONE;
+        uint32_t cur = AT91C_BASE_PIOA->PIO_PDSR & mask;
         if (prev != cur)
-            printf("PIOA & PA24 = %08x\n", cur);
+            TRACE_DEBUG("PIOA & PA24 = %08x\n", cur);
         prev = cur;
     }
 
-    while(0) {
+    while(1) {
         uint8_t c = 0x55;
-        printf("sending %c\n\r", c);
+        TRACE_DEBUG("sending %c\n\r", c);
         phone_tx(c);
     }
 }
+
+
