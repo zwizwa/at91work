@@ -49,7 +49,8 @@ TRACE_LEVEL = 5
 
 # Optimization level, put in comment for debugging
 # OPTIMIZATION = -Os
-OPTIMIZATION = -O0 -Wno-unused-but-set-variable
+# OPTIMIZATION = -O0 -Wno-unused-but-set-variable
+OPTIMIZATION = -Os -Wno-unused-but-set-variable
 
 # AT91 library directory
 AT91LIB = ../at91lib

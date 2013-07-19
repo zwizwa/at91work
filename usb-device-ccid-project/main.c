@@ -545,6 +545,7 @@ int main( void )
     VBUS_CONFIGURE();
     while (USBD_GetState() < USBD_STATE_CONFIGURED);
 
+    // FIXME: What if there is no card?
     CCID_Insertion();
 
     // Infinite loop
