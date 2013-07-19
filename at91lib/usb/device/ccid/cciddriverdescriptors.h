@@ -127,6 +127,8 @@
 #define ICC_CHANGE                            0x02
 #define ICC_INSERTED_EVENT                    ICC_PRESENT+ICC_CHANGE
 
+// 6.2.6 PC_to_RDR_GetSlotStatus  (Table 6.2-3 Slot Status Register) same as ICC_BS_*PRESENT*
+
 // ICCD: Table 6.1-8 Bitmap for bStatus field
 #define ICC_BS_PRESENT_ACTIVATED     0x00 // USB-ICC is present and activated
 #define ICC_BS_PRESENT_NOTACTIVATED  0x01 // USB-ICC is present but not activated

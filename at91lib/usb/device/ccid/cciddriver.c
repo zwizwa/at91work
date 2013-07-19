@@ -639,8 +639,17 @@ static void RDRtoPCSlotStatus( void )
     // Header fields settings
     ccidDriver.sCcidMessage.bMessageType = RDR_TO_PC_SLOTSTATUS;
     ccidDriver.sCcidMessage.wLength   = 0;
-    ccidDriver.sCcidMessage.bStatus   = ccidDriver.SlotStatus;
     ccidDriver.sCcidMessage.bError    = 0;
+
+    /* ccidDriver.SlotStatus uses the status encoding for
+       RDR_to_PC_NotifySlotChange (6.3.1).  This is not the same as
+       the encoding used in RDR_to_PC_SlotStatus (6.2.2), which is the
+       same as the Slot Status register (6.2.6, table 6.2-3) */
+    // FIXME: ICC_BS_PRESENT_ACTIVATED?
+    ccidDriver.sCcidMessage.bStatus =
+        (ccidDriver.SlotStatus & ICC_PRESENT) ?
+        ICC_BS_PRESENT_NOTACTIVATED : ICC_BS_NOTPRESENT;
+
     // 00h Clock running
     // 01h Clock stopped in state L
     // 02h Clock stopped in state H
@@ -656,7 +665,7 @@ static void RDRtoPCSlotStatus( void )
 static void RDRtoPCDatablock_ATR( void )
 {
     unsigned char i;
-    unsigned char Atr[ATR_SIZE_MAX];
+    unsigned char Atr[ATR_SIZE_MAX] = {};
     unsigned char length;
 
     //TRACE_DEBUG("RDRtoPCDatablock\n\r");

@@ -92,7 +92,7 @@ static unsigned int ISO7816_GetChar( unsigned char *pCharToReceive )
     // Wait USART ready for reception
     while( ((AT91C_BASE_US0->US_CSR & AT91C_US_RXRDY) == 0) ) {
         if(timeout++ >6000) {
-            TRACE_DEBUG("TimeOut\n\r");
+            TRACE_DEBUG("ISO7816_GetChar TimeOut\n\r");
             return( 0 );
         }
     }
