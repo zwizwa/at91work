@@ -55,6 +55,9 @@ OPTIMIZATION = -Os -Wno-unused-but-set-variable
 # AT91 library directory
 AT91LIB = ../at91lib
 
+# Additional GPL library code
+GPLLIB = ../src
+
 # Output file basename
 OUTPUT = simtrace-phone-project-$(BOARD)-$(CHIP)
 
@@ -105,6 +108,7 @@ VPATH += $(PERIPH)/dbgu $(PERIPH)/pio $(PERIPH)/pit $(PERIPH)/aic $(PERIPH)/pmc
 VPATH += $(PERIPH)/cp15
 VPATH += $(BOARDS)/$(BOARD) $(BOARDS)/$(BOARD)/$(CHIP)
 VPATH += $(USB)/device/ccid $(COMP)/iso7816 $(PERIPH)/usart
+VPATH += $(GPLLIB)
 
 # Objects built from C source files
 C_OBJECTS = main.o
@@ -123,6 +127,7 @@ C_OBJECTS += led.o math.o stdio.o
 C_OBJECTS += aic.o dbgu.o pio.o pio_it.o pit.o pmc.o cp15.o
 C_OBJECTS += board_memories.o board_lowlevel.o
 C_OBJECTS += usart.o iso7816_4.o cciddriver.o
+C_OBJECTS += iso7816.o
 
 # Objects built from Assembly source files
 ASM_OBJECTS = board_cstartup.o

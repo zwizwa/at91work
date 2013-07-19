@@ -43,7 +43,7 @@
 // #include <usb/device/core/USBD.h>
 #include <dbgu/dbgu.h>
 //#include <usb/device/ccid/cciddriver.h>
-#include <iso7816/iso7816_4.h>
+// #include <iso7816/iso7816_4.h>
 // #include <pmc/pmc.h>
 
 #include <string.h>
@@ -65,6 +65,7 @@ static const Pin pinsPower[] = {
 
 
 
+void phone_init(void);
 
 
 //------------------------------------------------------------------------------
@@ -92,8 +93,8 @@ int main( void )
     /* power up the card */
     PIO_Set(&pinsPower[0]);
 
-    ISO7816_Init( pinIso7816RstMC );
-
+    /* Init phone IS7816 USART */
+    phone_init();
 
     // Infinite loop
     while (1) {
