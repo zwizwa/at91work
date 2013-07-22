@@ -35,10 +35,10 @@
 
 
 // Pins: as annotated on schematics
-#define RST_PHONE  AT91C_PIO_PA24
-#define VCC_PHONE  AT91C_PIO_PA25
 #define  IO_PHONE  AT91C_PA22_TXD1
 #define CLK_PHONE  AT91C_PA23_SCK1
+#define RST_PHONE  AT91C_PIO_PA24
+#define VCC_PHONE  AT91C_PIO_PA25
 
 enum {
     PHONE_INVALID = 0,
@@ -53,12 +53,13 @@ uint32_t phone_tx(uint8_t c) {
     /* Switch RX/TX state if necessary. */
     if (phone_state != PHONE_TX) {
         phone_usart->US_CR = AT91C_US_RSTSTA | AT91C_US_RSTIT | AT91C_US_RSTNACK;
+        phone_usart->US_CR = AT91C_US_TXEN;
         phone_state = PHONE_TX;
         TRACE_DEBUG("PHONE_TX\n\r");
     }
     /* Flush */
     while((phone_usart->US_CSR & AT91C_US_TXRDY) == 0) {
-        TRACE_DEBUG("!TXRDY\n\r");
+        // TRACE_DEBUG("!TXRDY\n\r");
     }
     TRACE_DEBUG("TXRDY\n\r");
     /* Send */
@@ -70,7 +71,7 @@ uint32_t phone_tx(uint8_t c) {
           (1<<10));
     if (status != 0) {
         TRACE_DEBUG("E:0x%X\n\r",  phone_usart->US_CSR);
-        TRACE_DEBUG("Nb:0x%X\n\r", phone_usart->US_NER );
+        TRACE_DEBUG("Nb:0x%X\n\r", phone_usart->US_NER);
         phone_usart->US_CR =  AT91C_US_RSTSTA;
     }
     return status;
@@ -97,10 +98,11 @@ void phone_init(void) {
     */
 
     /* Enable usart peripheral clock */
-    AT91C_BASE_PMC->PMC_PCER = 1 << AT91C_ID_US0;
+    AT91C_BASE_PMC->PMC_PCER = (1 << AT91C_ID_US1);
 
     /* PHONE I/O and CLK controlled by peripheral A (Table 10-3) */
     AT91C_BASE_PIOA->PIO_ASR = IO_PHONE | CLK_PHONE;
+    AT91C_BASE_PIOA->PIO_PDR = IO_PHONE | CLK_PHONE;
 
     /* PHONE RST and VCC are input.  This pin is tied to 3V3,100K.  */
     AT91C_BASE_PIOA->PIO_ODR = RST_PHONE | VCC_PHONE;
@@ -111,6 +113,10 @@ void phone_init(void) {
         AT91C_US_RSTRX
         | AT91C_US_RSTTX
         | AT91C_US_RXDIS
+        | AT91C_US_TXDIS;
+
+    phone_usart->US_CR =
+        AT91C_US_RXDIS
         | AT91C_US_TXDIS;
 
     /* Set mode to ISO7816 T0, external clock source */
@@ -131,17 +137,33 @@ void phone_init(void) {
     /* Set ATR clock div to 372 */
     phone_usart->US_FIDI = 372 & 0x3FF;
 
+    /* Disable Receiver Time-out */
+    phone_usart->US_RTOR = 0;
+
+    /* Disable Transmitter Timeguard */
+    phone_usart->US_TTGR = 0;
+
     /* Enable TX */
-    phone_usart->US_CR = AT91C_US_TXEN | AT91C_US_RXDIS;
+    phone_usart->US_CR = AT91C_US_TXEN;
+    phone_usart->US_CR = AT91C_US_RXEN;
+
+    /* FIXME: read RHR once to flush? */
+    phone_usart->US_RHR;
+
 
     uint32_t prev = 0;
+    int cycles = 0;
     while(0) {
-        uint32_t mask = RST_PHONE | VCC_PHONE;
-        // uint32_t mask = CLK_PHONE;
+        // uint32_t mask = RST_PHONE | VCC_PHONE;
+
+        uint32_t mask = CLK_PHONE;
         uint32_t cur = AT91C_BASE_PIOA->PIO_PDSR & mask;
-        if (prev != cur)
-            TRACE_DEBUG("PIOA & PA24 = %08x\n", cur);
+        // if ((prev != cur) && (cur == 0)) {
+            // TRACE_DEBUG("%d ",cycles);
+            // TRACE_DEBUG("PIOA & PA24 = %08x\n", cur);
+        // }
         prev = cur;
+        cycles++;
     }
 
     while(1) {
