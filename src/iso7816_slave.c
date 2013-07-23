@@ -30,7 +30,8 @@
  */
 
 #include <stdint.h>
-#include <errno.h>
+#include <string.h>
+#include "errno.h"
 #include <utility/trace.h>
 
 /* LOW-LEVEL non-blocking I/O */
@@ -42,34 +43,92 @@ int iso7816_port_rx(struct iso7816_port *p, uint8_t *c);
 
 void iso7816_port_get_rst_vcc(struct iso7816_port *p, int *rst, int *vcc);
 
-// FIXME: scaffolding: replace with non-blocking state machines later.
-int iso7816_port_txn(struct iso7816_port *p, uint8_t *c, int n) {
-    uint32_t rv = 0;
-    while(!rv && n-- ) {
-        do { rv = iso7816_port_tx(p, *c); } while (-EAGAIN == rv);
-        c++;
-    }
-    return rv;
-}
-int iso7816_port_rxn(struct iso7816_port *p, uint8_t *c, int n) {
-    uint32_t rv = 0;
-    while(!rv && n--) {
-        do { rv = iso7816_port_rx(p, c); } while (-EAGAIN == rv);
-        c++;
-    }
-    return rv;
-}
 
 
 
 
 /* BYTE-LEVEL PROTOCOL */
 
-struct iso7816_slave {
-    struct iso7816_port *port;
+enum iso7816_state {
+    S_INIT = 0, // wait for RST low
+    S_RESET,    // wait for RST high
+
+    S_HALT,     // scaffolding: break loop
+
+    /* RX/TX: io_next contains next state after I/O is done */
+    S_RX,
+    S_TX,
 };
 
+struct iso7816_slave {
+    struct iso7816_port *port;
+    enum iso7816_state state;
+    enum iso7816_state io_next;  // next state after I/O is done
+    uint8_t msg[5 + 256]; // FIXME: check max message size
+    int msg_index;  // current read(RX) or write(TX) index
+    int msg_size;   // current(TX) or expected(RX) size of message
+};
 
+static void io_next(struct iso7816_slave *s, int rv) {
+    switch (rv) {
+    case -EAGAIN:
+        break;
+    case ENOERR:
+        s->msg_index++;
+        if (s->msg_index >= s->msg_size) {
+            s->state = s->io_next;
+        }
+        break;
+    default:
+        TRACE_DEBUG("i/o error %d\n\r", rv);
+        s->state = S_RESET;
+        break;
+    }
+}
+
+int iso7816_slave_tick(struct iso7816_slave *s) {
+    switch(s->state) {
+    case S_INIT:
+        break;
+
+    case S_RESET:
+        break;
+
+        /* Message transfer */
+    case S_RX: io_next(s, iso7816_port_rx(s->port, &s->msg[s->msg_index])); break;
+    case S_TX: io_next(s, iso7816_port_tx(s->port,  s->msg[s->msg_index])); break;
+
+    default:
+        s->state = S_RESET;
+        break;
+        /* Scaffolding: end loop */
+    case S_HALT:
+        return ENOERR;
+    }
+    return -EAGAIN; // state != S_HALT
+}
+
+// FIXME: scaffolding: run state machine
+int iso7816_run(struct iso7816_slave *s) {
+    int rv;
+    while (-EAGAIN == (rv = iso7816_slave_tick(s)));
+    return rv;
+}
+
+
+// FIXME: scaffolding: replace with non-blocking state machines later.
+static int iso7816_slave_send(struct iso7816_slave *s) {
+    s->msg_index = 0;
+    s->state     = S_TX;
+    s->io_next   = S_HALT;
+    return iso7816_run(s);
+}
+static int iso7816_slave_receive(struct iso7816_slave *s) {
+    s->msg_index = 0;
+    s->state     = S_RX;
+    s->io_next   = S_HALT;
+    return iso7816_run(s);
+}
 static void iso7816_slave_wait_off(struct iso7816_slave *s) {
     int vcc, rst;
     do { iso7816_port_get_rst_vcc(s->port, &vcc, &rst); }
@@ -81,46 +140,42 @@ static void iso7816_slave_wait_reset(struct iso7816_slave *s) {
     while (!(vcc && rst));
 }
 static void iso7816_slave_send_atr(struct iso7816_slave *s) {
-    TRACE_DEBUG("ATR\n\r");
-    uint8_t atr[] = {0x3B, 0x98, 0x96, 0x00,
-                     0x93, 0x94, 0x03, 0x08,
-                     0x05, 0x03, 0x03, 0x03};
-    iso7816_port_txn(s->port, atr, sizeof(atr));
+    TRACE_DEBUG("tx ATR\n\r");
+    const uint8_t atr[] = {0x3B, 0x98, 0x96, 0x00,
+                           0x93, 0x94, 0x03, 0x08,
+                           0x05, 0x03, 0x03, 0x03};
+    s->msg_size = sizeof(atr);
+    memcpy(s->msg, atr, s->msg_size);
+    iso7816_slave_send(s);
 }
-
-void hexdump(uint8_t *c, int n) {
-    while(n--) TRACE_DEBUG(" %02x", *c++);
-}
-
-
 static void iso7816_slave_receive_pts(struct iso7816_slave *s) {
-    uint8_t c[3]; // hardcoded for PTS from BLU phone
-    iso7816_port_rxn(s->port, c, sizeof(c));
-    TRACE_DEBUG("PTS:"); hexdump(c, sizeof(c)); TRACE_DEBUG("\n\r");
+    s->msg_size = 3; // hardcoded for PTS from BLU phone
+    iso7816_slave_receive(s);
+    TRACE_DEBUG("rx PTS %02x %02x %02x\n\r", s->msg[0], s->msg[1], s->msg[2]);
 }
 static void iso7816_slave_send_pts_ack(struct iso7816_slave *s) {
-    TRACE_DEBUG("PTS ACK\n\r");
-    uint8_t c[] = {0xFF, 0x00, 0xFF};
-    iso7816_port_txn(s->port, c, sizeof(c));
+    TRACE_DEBUG("tx PTS ACK\n\r");
+    s->msg_size = 3; // just send it back
+    iso7816_slave_send(s);
 }
 
 int iso7816_slave_transact_apdu(struct iso7816_slave *s) {
     // HEADER
-    {
-        uint8_t c[5];
-        iso7816_port_rxn(s->port, c, sizeof(c));
-        TRACE_DEBUG("TPDU_header:"); hexdump(c, sizeof(c)); TRACE_DEBUG("\n\r");
-    }
+    s->msg_size = 5;
+    iso7816_slave_receive(s);
+    TRACE_DEBUG("TPDU_header: %02x %02x %02x %02x %02x\n\r",
+                s->msg[0],s->msg[1],s->msg[2],s->msg[3],s->msg[4]);
 
     // protocol byte (ack)
-    iso7816_port_tx(s->port, 0xA4);
+    s->msg[0] = s->msg[1];
+    s->msg_size = 1;
+    iso7816_slave_send(s);
 
     // payload
-    {
-        uint8_t c[2];
-        iso7816_port_rxn(s->port, c, sizeof(c));
-        TRACE_DEBUG("TPDU_payload:"); hexdump(c, sizeof(c)); TRACE_DEBUG("\n\r");
-    }
+    s->msg_size = 2;
+    iso7816_slave_receive(s);
+    TRACE_DEBUG("TPDU_payload: %02x %02x\n\r", s->msg[0], s->msg[1]);
+
     return -1;
 }
 
