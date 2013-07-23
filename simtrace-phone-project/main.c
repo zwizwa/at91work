@@ -120,7 +120,9 @@ void NormalPowerMode(void)
 
 }
 
-void phone_init(void);
+struct iso7816_slave;
+struct iso7816_slave *iso7816_slave_init(void);
+void iso7816_slave_mainloop(struct iso7816_slave *p);
 
 
 //------------------------------------------------------------------------------
@@ -135,7 +137,7 @@ int main( void )
 {
     // Initialize traces
     TRACE_CONFIGURE(DBGU_STANDARD, 115200, BOARD_MCK);
-    printf("-- SIMtrace PHONE side driver \n\r");
+    printf("-- SIMtrace ISO7816 slave driver \n\r");
     printf("-- Compiled: %s %s --\n\r", __DATE__, __TIME__);
 
     NormalPowerMode();
@@ -150,12 +152,12 @@ int main( void )
     /* power up the card */
     PIO_Set(&pinsPower[0]);
 
-    /* Init phone IS7816 USART */
-    phone_init();
+    /* Init phone ISO7816 USART */
+    struct iso7816_slave *s = iso7816_slave_init();
 
-    // Infinite loop
-    while (1) {
-    }
+    /* Comm handler */
+    iso7816_slave_mainloop(s);
+
     return 0;
 }
 

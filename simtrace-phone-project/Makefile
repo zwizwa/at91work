@@ -49,8 +49,7 @@ TRACE_LEVEL = 5
 
 # Optimization level, put in comment for debugging
 # OPTIMIZATION = -Os
-# OPTIMIZATION = -O0 -Wno-unused-but-set-variable
-OPTIMIZATION = -Os -Wno-unused-but-set-variable
+OPTIMIZATION = -O0 -Wno-unused-but-set-variable -Wno-format -Werror
 
 # AT91 library directory
 AT91LIB = ../at91lib
@@ -127,7 +126,7 @@ C_OBJECTS += led.o math.o stdio.o
 C_OBJECTS += aic.o dbgu.o pio.o pio_it.o pit.o pmc.o cp15.o
 C_OBJECTS += board_memories.o board_lowlevel.o
 C_OBJECTS += usart.o iso7816_4.o cciddriver.o
-C_OBJECTS += iso7816.o
+C_OBJECTS += iso7816_slave.o iso7816_master.o iso7816_at91.o
 
 # Objects built from Assembly source files
 ASM_OBJECTS = board_cstartup.o
