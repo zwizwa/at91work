@@ -51,13 +51,22 @@ void iso7816_port_get_rst_vcc(struct iso7816_port *p, int *rst, int *vcc);
 
 enum iso7816_state {
     S_INIT = 0, // wait for RST low
-    S_RESET,    // wait for RST high
+    S_RESET,    // wait for RST high and start sending ATR
+    S_ATR,      // ATR is out, start waiting for PTS (FIXME: hardcoded to 3 bytes)
+
+    S_PTS,      // PTS is in, start sending PTS ack
+    S_PTS_ACK,  // PTS ack is out, start listening for TPDU header.
+
+    S_TPDU,
+    S_TPDU_PROT,
+    S_TPDU_PAYLOAD,
 
     S_HALT,     // scaffolding: break loop
 
     /* RX/TX: io_next contains next state after I/O is done */
     S_RX,
     S_TX,
+
 };
 
 struct iso7816_slave {
@@ -69,7 +78,39 @@ struct iso7816_slave {
     int msg_size;   // current(TX) or expected(RX) size of message
 };
 
-static void io_next(struct iso7816_slave *s, int rv) {
+
+/* Start S_RX/S_TX transfer and continue at io_next */
+static void next_io_start(struct iso7816_slave *s,
+                          enum iso7816_state transfer_state,
+                          enum iso7816_state io_next,
+                          const uint8_t *buf, int size) {
+    if (!size) {
+        s->state = io_next;
+    }
+    else {
+        s->state = transfer_state;
+        s->io_next = io_next;
+        s->msg_index = 0;
+        s->msg_size = size;
+        if (buf) {
+            memcpy(s->msg, buf, s->msg_size);
+        }
+    }
+}
+static void next_receive(struct iso7816_slave *s,
+                         enum iso7816_state io_next,
+                         int size) {
+    next_io_start(s, S_RX, io_next, NULL, size);
+}
+static void next_send(struct iso7816_slave *s,
+                      enum iso7816_state io_next,
+                      const uint8_t *buf,
+                      int size) {
+    next_io_start(s, S_TX, io_next, buf, size);
+}
+
+/* Continue or transfer and jump to io_next when done. */
+static void next_io(struct iso7816_slave *s, int rv) {
     switch (rv) {
     case -EAGAIN:
         break;
@@ -86,20 +127,80 @@ static void io_next(struct iso7816_slave *s, int rv) {
     }
 }
 
+/* Non-blocking state machine for ISO7816, slave side. */
+
+
 int iso7816_slave_tick(struct iso7816_slave *s) {
     switch(s->state) {
-    case S_INIT:
+        /* PROTOCOL:
+           These states are "high level" states executed in sequence. */
+
+        /**** STARTUP ****/
+
+    case S_INIT: {
+        /* Boot sync: wait for RST */
+        int rst;
+        iso7816_port_get_rst_vcc(s->port, &rst, NULL);
+        if (!rst) s->state = S_RESET;
+        break;
+    }
+    case S_RESET: {
+        /* Boot sync: wait for RST release. */
+        int rst, vcc;
+        iso7816_port_get_rst_vcc(s->port, &rst, &vcc);
+        if (rst && vcc) {
+            static const uint8_t atr[] =
+                {0x3B, 0x98, 0x96, 0x00, 0x93, 0x94,
+                 0x03, 0x08, 0x05, 0x03, 0x03, 0x03};
+            next_send(s, S_ATR, atr, sizeof(atr));
+        }
+        break;
+    }
+    case S_ATR:
+        /* ATR is out, wait for Protocol Type Selection (PTS) */
+        next_receive(s, S_PTS, 3);  // FIXME: hardcoded to 3 bytes from BTU phone
+        break;
+    case S_PTS:
+        /* PTS is in, send PTS ack */
+        TRACE_DEBUG("rx PTS %02x %02x %02x\n\r",
+                    s->msg[0], s->msg[1], s->msg[2]);
+        next_send(s, S_PTS_ACK, NULL, s->msg_size);
+        break;
+    case S_PTS_ACK:
+        /* PTS ack is out, Start waiting for TPDU header */
+        next_receive(s, S_TPDU, 5);
         break;
 
-    case S_RESET:
+
+        /**** MAIN LOOP ****/
+
+    case S_TPDU:
+        /* TPDU header is in, send protocol byte. */
+        TRACE_DEBUG("rx TPDU_header: %02x %02x %02x %02x %02x\n\r",
+                    s->msg[0],s->msg[1],s->msg[2],s->msg[3],s->msg[4]);
+        next_send(s, S_TPDU_PROT, &s->msg[1], 1);
         break;
+    case S_TPDU_PROT:
+        /* Protocol byte is in.  Receive data payload. */
+        next_receive(s, S_TPDU_PAYLOAD, s->msg[4]);
+        break;
+    case S_TPDU_PAYLOAD:
+        /* Payload is in. */
+        TRACE_DEBUG("TPDU_payload: %02x %02x\n\r", s->msg[0], s->msg[1]);
+        s->state = S_INIT; // FIXME
+        break;
+
+
+
+        /**** LOW LEVEL ****/
 
         /* Message transfer */
-    case S_RX: io_next(s, iso7816_port_rx(s->port, &s->msg[s->msg_index])); break;
-    case S_TX: io_next(s, iso7816_port_tx(s->port,  s->msg[s->msg_index])); break;
+    case S_RX: next_io(s, iso7816_port_rx(s->port, &s->msg[s->msg_index])); break;
+    case S_TX: next_io(s, iso7816_port_tx(s->port,  s->msg[s->msg_index])); break;
 
     default:
-        s->state = S_RESET;
+        TRACE_DEBUG("unknown state %d\n\r", s->state);
+        s->state = S_INIT;
         break;
         /* Scaffolding: end loop */
     case S_HALT:
@@ -109,11 +210,21 @@ int iso7816_slave_tick(struct iso7816_slave *s) {
 }
 
 // FIXME: scaffolding: run state machine
-int iso7816_run(struct iso7816_slave *s) {
+int iso7816_slave_run(struct iso7816_slave *s) {
     int rv;
     while (-EAGAIN == (rv = iso7816_slave_tick(s)));
     return rv;
 }
+
+#if 1
+
+void iso7816_slave_mainloop(struct iso7816_slave *s) {
+    s->state = S_INIT;
+    iso7816_slave_run(s);
+}
+
+
+#else
 
 
 // FIXME: scaffolding: replace with non-blocking state machines later.
@@ -179,20 +290,22 @@ int iso7816_slave_transact_apdu(struct iso7816_slave *s) {
     return -1;
 }
 
-void iso7816_slave_mainloop(struct iso7816_slave *p) {
+void iso7816_slave_mainloop(struct iso7816_slave *s) {
 
     while(1) {
-        iso7816_slave_wait_off(p);
-        iso7816_slave_wait_reset(p);
+        iso7816_slave_wait_off(s);
+        iso7816_slave_wait_reset(s);
 
-        iso7816_slave_send_atr(p);
+        iso7816_slave_send_atr(s);
 
-        iso7816_slave_receive_pts(p);
-        iso7816_slave_send_pts_ack(p);
+        iso7816_slave_receive_pts(s);
+        iso7816_slave_send_pts_ack(s);
 
-        while (0 == iso7816_slave_transact_apdu(p));
+        while (0 == iso7816_slave_transact_apdu(s));
     }
 }
+
+#endif
 
 
 
