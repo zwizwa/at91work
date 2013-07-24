@@ -1,33 +1,7 @@
-/* Adapted from iso7816_4.h */
-
-/* ----------------------------------------------------------------------------
- *         ATMEL Microcontroller Software Support 
- * ----------------------------------------------------------------------------
- * Copyright (c) 2008, Atmel Corporation
- *
- * All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions are met:
- *
- * - Redistributions of source code must retain the above copyright notice,
- * this list of conditions and the disclaimer below.
- *
- * Atmel's name may not be used to endorse or promote products derived from
- * this software without specific prior written permission.
- *
- * DISCLAIMER: THIS SOFTWARE IS PROVIDED BY ATMEL "AS IS" AND ANY EXPRESS OR
- * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
- * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT ARE
- * DISCLAIMED. IN NO EVENT SHALL ATMEL BE LIABLE FOR ANY DIRECT, INDIRECT,
- * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
- * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA,
- * OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
- * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
- * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
- * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- * ----------------------------------------------------------------------------
- */
+/* Licence: GPL
+   (c) 2010 by Harald Welte <hwelte@hmw-consulting.de>
+   (c) 2013 by Tom Schouten <tom@zwizwa.be>
+*/
 
 #include <stdint.h>
 #include <string.h>
@@ -49,6 +23,44 @@ void iso7816_port_get_rst_vcc(struct iso7816_port *p, int *rst, int *vcc);
 
 /* BYTE-LEVEL PROTOCOL */
 
+enum iso7816_ins {
+    INS_DEACTIVATE_FILE        = 0x04,
+    INS_ERASE_BINARY           = 0x0E,
+    INS_TERMINAL_PROFILE       = 0x10,
+    INS_FETCH                  = 0x12,
+    INS_TERMINAL_RESPONSE      = 0x14,
+    INS_VERIFY                 = 0x20,
+    INS_CHANGE_PIN             = 0x24,
+    INS_DISABLE_PIN            = 0x26,
+    INS_ENABLE_PIN             = 0x28,
+    INS_UNBLOCK_PIN            = 0x2C,
+    INS_INCREASE               = 0x32,
+    INS_ACTIVATE_FILE          = 0x44,
+    INS_MANAGE_CHANNEL         = 0x70,
+    INS_MANAGE_SECURE_CHANNEL  = 0x73,
+    INS_TRANSACT_DATA       L  = 0x75,
+    INS_EXTERNAL_AUTHOENTICATE = 0x82,
+    INS_GET_CHALLENGE          = 0x84,
+    INS_INTERNAL_AUTHENTICATE  = 0x88, // also 0x89 ??
+    INS_SEARCH_RECORD          = 0xA2,
+    INS_SELECT_FILE            = 0xA4,
+    INS_TERMINAL_CAPABILITY    = 0xAA,
+    INS_READ_BINARY            = 0xB0,
+    INS_READ_RECORD            = 0xB2,
+    INS_GET_RESPONSE           = 0xC0,   /* Transmission-oriented APDU */
+    INS_ENVELOPE               = 0xC2,
+    INS_RETRIEVE_DATA          = 0xCB,
+    INS_GET_DATA               = 0xCA,
+    INS_WRITE_BINARY           = 0xD0,
+    INS_WRITE_RECORD           = 0xD2,
+    INS_UPDATE_BINARY          = 0xD6,
+    INS_PUT_DATA               = 0xDA,
+    INS_SET_DATA               = 0xDB,
+    INS_UPDATE_DATA            = 0xDC,
+    INS_APPEND_RECORD          = 0xE2,
+    INS_STATUS                 = 0xF2,
+};
+
 enum iso7816_state {
     S_INIT = 0, // wait for RST low
     S_RESET,    // wait for RST high and start sending ATR
@@ -59,7 +71,8 @@ enum iso7816_state {
 
     S_TPDU,
     S_TPDU_PROT,
-    S_TPDU_PAYLOAD,
+    S_TPDU_REQ,
+    S_TPDU_SW,
     S_TPDU_RESP,
 
     S_HALT,     // scaffolding: break loop
@@ -79,6 +92,12 @@ struct tpdu {
     uint8_t data[];
 } __attribute__((__packed__));
 
+struct sw {
+    uint8_t sw1;
+    uint8_t sw2;
+} __attribute__((__packed__));
+
+
 struct iso7816_slave {
     struct iso7816_port *port;
     enum iso7816_state state;
@@ -89,6 +108,7 @@ struct iso7816_slave {
         struct tpdu tpdu;
         uint8_t buf[8 + 256];   // receive/send buffer
     } msg;
+    struct sw sw; // response code
 };
 
 
@@ -139,15 +159,40 @@ static void next_io(struct iso7816_slave *s, int rv) {
 }
 
 static void next_receive_tpdu_header(struct iso7816_slave *s) {
+    memset(s->msg.buf, 0x55, sizeof(s->msg.buf));  // simplify debugging
     next_receive(s, S_TPDU, s->msg.buf, sizeof(s->msg.tpdu));
 }
 
-static void print_c_apdu(struct iso7816_slave *s) {
-    printf("C-APDU: ");
+
+static void print_apdu(struct iso7816_slave *s) {
+    printf("APDU:");
     int i, len = sizeof(s->msg.tpdu) + s->msg.tpdu.p3;
-    for (i = 0; i < len; i++) printf("%02X", s->msg.buf[i]);
-    printf("\n\r");
+    for (i = 0; i < len; i++) printf(" %02X", s->msg.buf[i]);
+    printf(" %02X %02X\n\r", s->sw.sw1, s->sw.sw2);
 }
+static void apdu_request(struct iso7816_slave *s) {
+    switch(s->msg.tpdu.ins) {
+    case INS_SELECT_FILE:
+        TRACE_DEBUG("SELECT_FILE %02x%02x\n\r",
+                    s->msg.tpdu.data[0],
+                    s->msg.tpdu.data[1]);
+        s->sw.sw1 = 0x9F;
+        s->sw.sw2 = 0x1A;
+        break;
+    case INS_GET_RESPONSE:
+        TRACE_DEBUG("GET_RESPONSE %d\n\r", s->msg.tpdu.p3);
+        memset(s->msg.tpdu.data, 0x55, s->msg.tpdu.p3);
+        s->sw.sw1 = 0x90;
+        s->sw.sw2 = 0x00;
+        break;
+    default:
+        TRACE_DEBUG("bad APDU\n");
+        break;
+    }
+
+    print_apdu(s);
+}
+
 
 
 /* Non-blocking state machine for ISO7816, slave side. */
@@ -161,7 +206,7 @@ int iso7816_slave_tick(struct iso7816_slave *s) {
     /* Monitor RST and VCC */
     if (!(rst && vcc)) {
         if (s->state != S_RESET) {
-            TRACE_DEBUG("RST=%d VCC=%d\n\r", rst, vcc)
+            TRACE_DEBUG("%d -> S_RESET\n\r", s->state)
             s->state = S_RESET;
         }
     }
@@ -173,12 +218,12 @@ int iso7816_slave_tick(struct iso7816_slave *s) {
 
         /**** STARTUP ****/
     case S_INIT:
-        /* Don't talk to iso7816 in an unknown state. */
+        /* Don't talk to iso7816 master in unknown state. */
         break;
     case S_RESET: {
         /* Boot sync: wait for RST release. */
         if (rst && vcc) {
-            TRACE_DEBUG("RST=VCC=1\n\r");
+            TRACE_DEBUG("S_RESET -> S_ATR\n\r");
             static const uint8_t atr[] =
                 {0x3B, 0x98, 0x96, 0x00, 0x93, 0x94,
                  0x03, 0x08, 0x05, 0x03, 0x03, 0x03};
@@ -188,16 +233,18 @@ int iso7816_slave_tick(struct iso7816_slave *s) {
     }
     case S_ATR:
         /* ATR is out, wait for Protocol Type Selection (PTS) */
+        TRACE_DEBUG("S_ATR\n\r");
         next_receive(s, S_PTS, NULL, 3);  // FIXME: hardcoded to 3 bytes from BTU phone
         break;
     case S_PTS:
         /* PTS is in, send PTS ack */
-        TRACE_DEBUG("rx PTS %02x %02x %02x\n\r",
+        TRACE_DEBUG("S_PTS %02x %02x %02x\n\r",
                     s->msg.buf[0], s->msg.buf[1], s->msg.buf[2]);
         next_send(s, S_PTS_ACK, NULL, 3);
         break;
     case S_PTS_ACK:
         /* PTS ack is out, Start waiting for TPDU header */
+        TRACE_DEBUG("S_PTS_ACK\n\r");
         next_receive_tpdu_header(s);
         break;
 
@@ -206,22 +253,46 @@ int iso7816_slave_tick(struct iso7816_slave *s) {
 
     case S_TPDU:
         /* TPDU header is in, send protocol byte. */
+        TRACE_DEBUG("S_TPDU\n\r");
         next_send(s, S_TPDU_PROT, &s->msg.tpdu.ins, 1);
         break;
     case S_TPDU_PROT:
-        /* Protocol byte is in.  Receive data payload. */
-        next_receive(s, S_TPDU_PAYLOAD, &s->msg.tpdu.data[0], s->msg.tpdu.p3);
+        /* Protocol byte is out.  Based on INS, we either read payload
+           from master and then perform high level APDU request, or we
+           perform request now and send the resulting bytes to
+           master. */
+        TRACE_DEBUG("S_TPDU_PROT\n\r");
+        switch(s->msg.tpdu.ins) {
+        case INS_SELECT_FILE:
+            /* Read data from master, then delegate request. */
+            next_receive(s, S_TPDU_REQ, &s->msg.tpdu.data[0], s->msg.tpdu.p3);
+            break;
+        case INS_GET_RESPONSE:
+            /* Delegate request, then send data to master. */
+            apdu_request(s);
+            next_send(s, S_TPDU_SW, &s->msg.tpdu.data[0], s->msg.tpdu.p3);
+            break;
+        default:
+            TRACE_DEBUG("INS %02X not supported\n\r", s->msg.tpdu.ins);
+            TRACE_DEBUG("TPDU: %02X %02X %02X %02X %02X\n\r",
+                        s->msg.buf[0], s->msg.buf[1], s->msg.buf[2],
+                        s->msg.buf[3], s->msg.buf[4]);
+            s->state = S_INIT;
+            break;
+        }
         break;
-    case S_TPDU_PAYLOAD: {
-        /* TPDU Payload is in, completing C-APDU. */
-        print_c_apdu(s);
-        TRACE_DEBUG("tx TPDU_response\n\r");
-        static const uint8_t resp[] = {0x9F, 0x1A};
-        next_send(s, S_TPDU_RESP, resp, sizeof(resp));
+    case S_TPDU_REQ:
+        TRACE_DEBUG("S_TPDU_REQ\n\r");
+        apdu_request(s);
+        // fallthrough
+    case S_TPDU_SW:
+        /* TPDU data is transferred.  Send SW1:SW2. */
+        TRACE_DEBUG("S_TPDU_SW\n\r");
+        next_send(s, S_TPDU_RESP, &s->sw.sw1, sizeof(s->sw));
         break;
-    }
     case S_TPDU_RESP:
         /* Response sent, wait for next TPDU */
+        TRACE_DEBUG("S_TPDU_RESP\n\r");
         next_receive_tpdu_header(s);
         break;
 
