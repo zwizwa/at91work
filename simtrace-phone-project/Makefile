@@ -125,8 +125,8 @@ C_OBJECTS = main.o
 C_OBJECTS += led.o math.o stdio.o
 C_OBJECTS += aic.o dbgu.o pio.o pio_it.o pit.o pmc.o cp15.o
 C_OBJECTS += board_memories.o board_lowlevel.o
-C_OBJECTS += usart.o iso7816_4.o cciddriver.o
-C_OBJECTS += iso7816_slave.o iso7816_master.o iso7816_at91.o
+# C_OBJECTS += usart.o iso7816_4.o cciddriver.o
+C_OBJECTS += iso7816_slave.o iso7816_master.o iso7816_at91.o apdu.o
 
 # Objects built from Assembly source files
 ASM_OBJECTS = board_cstartup.o

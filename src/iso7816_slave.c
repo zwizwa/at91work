@@ -1,65 +1,34 @@
-/* Licence: GPL
+/* License: GPL
    (c) 2010 by Harald Welte <hwelte@hmw-consulting.de>
    (c) 2013 by Tom Schouten <tom@zwizwa.be>
 */
 
+/* Basic design notes.
+
+   - Separate platform/board parts from protocol part for UART and
+     control lines.  Allow reuse as MITM or full SIM-side
+     implementation (e.g. COS).
+
+   - Don't write blocking code; Structure as a non-blocking state
+     machine to avoid dependency on platform thread support.
+
+ */
+
+
 #include <stdint.h>
 #include <string.h>
-#include "errno.h"
 #include <utility/trace.h>
+#include "errno.h"
+#include "apdu.h"
 
-/* LOW-LEVEL non-blocking I/O */
+#ifndef TRACE_DEBUG
+#define TRACE_DEBUG printf
+#endif
 
-struct iso7816_port; // Abstract. implementation = platform-specific
-struct iso7816_port *iso7816_port_init(int port_nb); // port_nb is board-specific
-int iso7816_port_tx(struct iso7816_port *p, uint8_t c);
-int iso7816_port_rx(struct iso7816_port *p, uint8_t *c);
-
-void iso7816_port_get_rst_vcc(struct iso7816_port *p, int *rst, int *vcc);
-
+#include "iso7816_port.h"
 
 
-
-
-/* BYTE-LEVEL PROTOCOL */
-
-enum iso7816_ins {
-    INS_DEACTIVATE_FILE        = 0x04,
-    INS_ERASE_BINARY           = 0x0E,
-    INS_TERMINAL_PROFILE       = 0x10,
-    INS_FETCH                  = 0x12,
-    INS_TERMINAL_RESPONSE      = 0x14,
-    INS_VERIFY                 = 0x20,
-    INS_CHANGE_PIN             = 0x24,
-    INS_DISABLE_PIN            = 0x26,
-    INS_ENABLE_PIN             = 0x28,
-    INS_UNBLOCK_PIN            = 0x2C,
-    INS_INCREASE               = 0x32,
-    INS_ACTIVATE_FILE          = 0x44,
-    INS_MANAGE_CHANNEL         = 0x70,
-    INS_MANAGE_SECURE_CHANNEL  = 0x73,
-    INS_TRANSACT_DATA       L  = 0x75,
-    INS_EXTERNAL_AUTHOENTICATE = 0x82,
-    INS_GET_CHALLENGE          = 0x84,
-    INS_INTERNAL_AUTHENTICATE  = 0x88, // also 0x89 ??
-    INS_SEARCH_RECORD          = 0xA2,
-    INS_SELECT_FILE            = 0xA4,
-    INS_TERMINAL_CAPABILITY    = 0xAA,
-    INS_READ_BINARY            = 0xB0,
-    INS_READ_RECORD            = 0xB2,
-    INS_GET_RESPONSE           = 0xC0,   /* Transmission-oriented APDU */
-    INS_ENVELOPE               = 0xC2,
-    INS_RETRIEVE_DATA          = 0xCB,
-    INS_GET_DATA               = 0xCA,
-    INS_WRITE_BINARY           = 0xD0,
-    INS_WRITE_RECORD           = 0xD2,
-    INS_UPDATE_BINARY          = 0xD6,
-    INS_PUT_DATA               = 0xDA,
-    INS_SET_DATA               = 0xDB,
-    INS_UPDATE_DATA            = 0xDC,
-    INS_APPEND_RECORD          = 0xE2,
-    INS_STATUS                 = 0xF2,
-};
+/* BYTE-LEVEL SLAVE-SIDE PROTOCOL */
 
 enum iso7816_state {
     S_INIT = 0, // wait for RST low
@@ -75,35 +44,19 @@ enum iso7816_state {
     S_TPDU_SW,
     S_TPDU_RESP,
 
-    S_HALT,     // scaffolding: break loop
-
     /* RX/TX: io_next contains next state after I/O is done */
     S_RX,
     S_TX,
 
 };
 
-struct tpdu {
-    uint8_t cla;
-    uint8_t ins;
-    uint8_t p1;
-    uint8_t p2;
-    uint8_t p3;
-    uint8_t data[];
-} __attribute__((__packed__));
-
-struct sw {
-    uint8_t sw1;
-    uint8_t sw2;
-} __attribute__((__packed__));
-
 
 struct iso7816_slave {
     struct iso7816_port *port;
     enum iso7816_state state;
     enum iso7816_state io_next; // next state after I/O is done
-    uint8_t *io_ptr;        // current read(RX) or write(TX) index
-    uint8_t *io_endx;       // current(TX) or expected(RX) size of message
+    uint8_t *io_ptr;            // current read(RX) or write(TX) index
+    uint8_t *io_endx;           // current(TX) or expected(RX) size of message
     union {
         struct tpdu tpdu;
         uint8_t buf[8 + 256];   // receive/send buffer
@@ -114,9 +67,9 @@ struct iso7816_slave {
 
 /* Start S_RX/S_TX transfer and continue at io_next */
 static void next_io_start(struct iso7816_slave *s,
-                          enum iso7816_state transfer_state,
                           enum iso7816_state io_next,
-                          uint8_t *buf, int size) {
+                          uint8_t *buf, int size,
+                          enum iso7816_state transfer_state) {
     if (!size) {
         s->state = io_next;
     }
@@ -131,13 +84,13 @@ static void next_receive(struct iso7816_slave *s,
                          enum iso7816_state io_next,
                          uint8_t *buf,
                          int size) {
-    next_io_start(s, S_RX, io_next, buf, size);
+    next_io_start(s, io_next, buf, size, S_RX);
 }
 static void next_send(struct iso7816_slave *s,
                       enum iso7816_state io_next,
                       const uint8_t *buf,
                       int size) {
-    next_io_start(s, S_TX, io_next, (uint8_t*)buf, size);
+    next_io_start(s, io_next, (uint8_t*)buf, size, S_TX);
 }
 
 /* Continue or transfer and jump to io_next when done. */
@@ -159,46 +112,17 @@ static void next_io(struct iso7816_slave *s, int rv) {
 }
 
 static void next_receive_tpdu_header(struct iso7816_slave *s) {
-    memset(s->msg.buf, 0x55, sizeof(s->msg.buf));  // simplify debugging
+    memset(s->msg.buf, 0x55, sizeof(s->msg.buf));  // init simplifies debugging
     next_receive(s, S_TPDU, s->msg.buf, sizeof(s->msg.tpdu));
 }
 
-
-static void print_apdu(struct iso7816_slave *s) {
-    printf("APDU:");
-    int i, len = sizeof(s->msg.tpdu) + s->msg.tpdu.p3;
-    for (i = 0; i < len; i++) printf(" %02X", s->msg.buf[i]);
-    printf(" %02X %02X\n\r", s->sw.sw1, s->sw.sw2);
-}
-static void apdu_request(struct iso7816_slave *s) {
-    switch(s->msg.tpdu.ins) {
-    case INS_SELECT_FILE:
-        TRACE_DEBUG("SELECT_FILE %02x%02x\n\r",
-                    s->msg.tpdu.data[0],
-                    s->msg.tpdu.data[1]);
-        s->sw.sw1 = 0x9F;
-        s->sw.sw2 = 0x1A;
-        break;
-    case INS_GET_RESPONSE:
-        TRACE_DEBUG("GET_RESPONSE %d\n\r", s->msg.tpdu.p3);
-        memset(s->msg.tpdu.data, 0x55, s->msg.tpdu.p3);
-        s->sw.sw1 = 0x90;
-        s->sw.sw2 = 0x00;
-        break;
-    default:
-        TRACE_DEBUG("bad APDU\n");
-        break;
-    }
-
-    print_apdu(s);
-}
 
 
 
 /* Non-blocking state machine for ISO7816, slave side. */
 
 
-int iso7816_slave_tick(struct iso7816_slave *s) {
+void iso7816_slave_tick(struct iso7816_slave *s) {
 
     int rst, vcc;
     iso7816_port_get_rst_vcc(s->port, &rst, &vcc);
@@ -269,7 +193,7 @@ int iso7816_slave_tick(struct iso7816_slave *s) {
             break;
         case INS_GET_RESPONSE:
             /* Delegate request, then send data to master. */
-            apdu_request(s);
+            apdu_request(&s->msg.tpdu, &s->sw);
             next_send(s, S_TPDU_SW, &s->msg.tpdu.data[0], s->msg.tpdu.p3);
             break;
         default:
@@ -283,7 +207,7 @@ int iso7816_slave_tick(struct iso7816_slave *s) {
         break;
     case S_TPDU_REQ:
         TRACE_DEBUG("S_TPDU_REQ\n\r");
-        apdu_request(s);
+        apdu_request(&s->msg.tpdu, &s->sw);
         // fallthrough
     case S_TPDU_SW:
         /* TPDU data is transferred.  Send SW1:SW2. */
@@ -307,24 +231,14 @@ int iso7816_slave_tick(struct iso7816_slave *s) {
         TRACE_DEBUG("unknown state %d\n\r", s->state);
         s->state = S_INIT;
         break;
-        /* Scaffolding: end loop */
-    case S_HALT:
-        return ENOERR;
     }
-    return -EAGAIN; // state != S_HALT
 }
 
-// FIXME: scaffolding: run state machine
-int iso7816_slave_run(struct iso7816_slave *s) {
-    int rv;
-    while (-EAGAIN == (rv = iso7816_slave_tick(s)));
-    return rv;
-}
 
 
 void iso7816_slave_mainloop(struct iso7816_slave *s) {
     s->state = S_INIT;
-    iso7816_slave_run(s);
+    while(1) iso7816_slave_tick(s);
 }
 
 
