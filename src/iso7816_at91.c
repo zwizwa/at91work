@@ -74,7 +74,7 @@ int iso7816_port_tx(struct iso7816_port *p, uint8_t c) {
     if (p->dir != DIR_TX) {
         p->usart->US_CR = AT91C_US_RSTSTA | AT91C_US_RSTIT | AT91C_US_RSTNACK;
         p->dir = DIR_TX;
-        TRACE_DEBUG("TX\n\r");
+        // TRACE_DEBUG("TX\n\r");
     }
     if ((p->usart->US_CSR & AT91C_US_TXRDY) == 0) return -EAGAIN;
     p->usart->US_THR = c;
@@ -87,7 +87,7 @@ int iso7816_port_rx(struct iso7816_port *p, uint8_t *c) {
         if ((p->usart->US_CSR & AT91C_US_TXEMPTY) == 0) return -EAGAIN;
         p->usart->US_CR = AT91C_US_RSTSTA | AT91C_US_RSTIT | AT91C_US_RSTNACK;
         p->dir = DIR_RX;
-        TRACE_DEBUG("RX\n\r");
+        // TRACE_DEBUG("RX\n\r");
     }
     if ((p->usart->US_CSR & AT91C_US_RXRDY) == 0) return -EAGAIN;
     *c = ((p->usart->US_RHR) & 0xFF);
