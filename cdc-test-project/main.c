@@ -184,11 +184,6 @@ unsigned char USBState = STATE_IDLE;
 /// List of pins that must be configured for use by the application.
 static const Pin pins[] = {PIN_USART1_TXD, PIN_USART1_RXD};
 
-/// Double-buffer for storing incoming USART data.
-static unsigned char usartBuffers[2][DATABUFFERSIZE];
-
-/// Current USART buffer index.
-static unsigned char usartCurrentBuffer = 0;
 
 /// Buffer for storing incoming USB data.
 static unsigned char usbBuffer[DATABUFFERSIZE];
@@ -480,37 +475,6 @@ void NormalPowerMode(void)
 //         Internal functions
 //------------------------------------------------------------------------------
 
-//------------------------------------------------------------------------------
-/// Handles interrupts coming from Timer #0.
-//------------------------------------------------------------------------------
-static void ISR_Timer0()
-{
-    unsigned char size;
-    unsigned int status = AT91C_BASE_TC0->TC_SR;
-
-    if ((status & AT91C_TC_CPCS) != 0) {
-    
-        // Flush PDC buffer
-        size = DATABUFFERSIZE - AT91C_BASE_US1->US_RCR;
-        if (size == 0) {
-
-            AT91C_BASE_TC0->TC_CCR = AT91C_TC_CLKEN | AT91C_TC_SWTRG;
-            return;
-        }
-        AT91C_BASE_US1->US_RCR = 0;
-    
-        // Send current buffer through the USB
-        while (CDCDSerialDriver_Write(usartBuffers[usartCurrentBuffer],
-                                      size, 0, 0) != USBD_STATUS_SUCCESS);
-    
-        // Restart read on buffer
-        USART_ReadBuffer(AT91C_BASE_US1,
-                         usartBuffers[usartCurrentBuffer],
-                         DATABUFFERSIZE);
-        usartCurrentBuffer = 1 - usartCurrentBuffer;
-        AT91C_BASE_TC0->TC_CCR = AT91C_TC_CLKEN | AT91C_TC_SWTRG;
-    }
-}
 
 
 //------------------------------------------------------------------------------
@@ -552,6 +516,9 @@ static void UsbDataReceived(unsigned int unused,
 {
     // Check that data has been received successfully
     if (status == USBD_STATUS_SUCCESS) {
+        int i;
+        for (i=0; i<received; i++)
+            DBGU_PutChar(usbBuffer[i]);
 
         // Send data through USART
         while (!USART_WriteBuffer(AT91C_BASE_US1, usbBuffer, received));
@@ -569,72 +536,13 @@ static void UsbDataReceived(unsigned int unused,
 
         TRACE_WARNING( "UsbDataReceived: Transfer error\n\r");
     }
-}
 
-//------------------------------------------------------------------------------
-/// Handles interrupts coming from USART #1.
-//------------------------------------------------------------------------------
-static void ISR_Usart0()
-{
-    unsigned int status = AT91C_BASE_US1->US_CSR;
-    unsigned short serialState;
 
-    // If USB device is not configured, do nothing
-    if (USBD_GetState() != USBD_STATE_CONFIGURED) {
-
-        AT91C_BASE_US1->US_IDR = 0xFFFFFFFF;
-        return;
-    }
-
-    // Buffer has been read successfully
-    if ((status & AT91C_US_ENDRX) != 0) {
-
-        // Disable timer
-        AT91C_BASE_TC0->TC_CCR = AT91C_TC_CLKDIS;
-
-        // Send buffer through the USB
-        while (CDCDSerialDriver_Write(usartBuffers[usartCurrentBuffer],
-                                      DATABUFFERSIZE, 0, 0) != USBD_STATUS_SUCCESS);
-
-        // Restart read on buffer
-        USART_ReadBuffer(AT91C_BASE_US1,
-                         usartBuffers[usartCurrentBuffer],
-                         DATABUFFERSIZE);
-        usartCurrentBuffer = 1 - usartCurrentBuffer;
-
-        // Restart timer
-        AT91C_BASE_TC0->TC_CCR = AT91C_TC_CLKEN | AT91C_TC_SWTRG;
-    }
-
-    // Buffer has been sent
-    if ((status & AT91C_US_TXBUFE) != 0) {
-
-        // Restart USB read
-        CDCDSerialDriver_Read(usbBuffer,
-                              DATABUFFERSIZE,
-                              (TransferCallback) UsbDataReceived,
-                              0);
-        AT91C_BASE_US1->US_IDR = AT91C_US_TXBUFE;
-    }
-
-    // Errors
-    serialState = CDCDSerialDriver_GetSerialState();
-
-    // Overrun
-    if ((status & AT91C_US_OVER) != 0) {
-
-        TRACE_WARNING( "ISR_Usart0: Overrun\n\r");
-        serialState |= CDCDSerialDriver_STATE_OVERRUN;
-    }
-
-    // Framing error
-    if ((status & AT91C_US_FRAME) != 0) {
-
-        TRACE_WARNING( "ISR_Usart0: Framing error\n\r");
-        serialState |= CDCDSerialDriver_STATE_FRAMING;
-    }
-
-    CDCDSerialDriver_SetSerialState(serialState);
+    // Make sure we get activated next time.
+    CDCDSerialDriver_Read(usbBuffer,
+                          DATABUFFERSIZE,
+                          (TransferCallback) UsbDataReceived,
+                          0);
 }
 
 //------------------------------------------------------------------------------
@@ -654,32 +562,6 @@ int main()
     // If they are present, configure Vbus & Wake-up pins
     PIO_InitializeInterrupts(0);
 
-    // Configure USART
-    PIO_Configure(pins, PIO_LISTSIZE(pins));
-    AT91C_BASE_PMC->PMC_PCER = 1 << AT91C_ID_US1;
-    AT91C_BASE_US1->US_IDR = 0xFFFFFFFF;
-    USART_Configure(AT91C_BASE_US1,
-                    USART_MODE_ASYNCHRONOUS,
-                    115200,
-                    BOARD_MCK);
-    USART_SetTransmitterEnabled(AT91C_BASE_US1, 1);
-    USART_SetReceiverEnabled(AT91C_BASE_US1, 1);
-    AIC_ConfigureIT(AT91C_ID_US1, 0, ISR_Usart0);
-    AIC_EnableIT(AT91C_ID_US1);
-
-    // Configure timer 0
-    AT91C_BASE_PMC->PMC_PCER = (1 << AT91C_ID_TC0);
-    AT91C_BASE_TC0->TC_CCR = AT91C_TC_CLKDIS;
-    AT91C_BASE_TC0->TC_IDR = 0xFFFFFFFF;
-    AT91C_BASE_TC0->TC_CMR = AT91C_TC_CLKS_TIMER_DIV5_CLOCK
-                             | AT91C_TC_CPCSTOP
-                             | AT91C_TC_CPCDIS
-                             | AT91C_TC_WAVESEL_UP_AUTO
-                             | AT91C_TC_WAVE;
-    AT91C_BASE_TC0->TC_RC = 0x00FF;
-    AT91C_BASE_TC0->TC_IER = AT91C_TC_CPCS;
-    AIC_ConfigureIT(AT91C_ID_TC0, 0, ISR_Timer0);
-    AIC_EnableIT(AT91C_ID_TC0);
 
     // BOT driver initialization
     CDCDSerialDriver_Initialize();
@@ -696,15 +578,6 @@ int main()
             // Connect pull-up, wait for configuration
             USBD_Connect();
             while (USBD_GetState() < USBD_STATE_CONFIGURED);
-
-            // Start receiving data on the USART
-            usartCurrentBuffer = 0;
-            USART_ReadBuffer(AT91C_BASE_US1, usartBuffers[0], DATABUFFERSIZE);
-            USART_ReadBuffer(AT91C_BASE_US1, usartBuffers[1], DATABUFFERSIZE);
-            AT91C_BASE_US1->US_IER = AT91C_US_ENDRX
-                                     | AT91C_US_FRAME
-                                     | AT91C_US_OVER;
-            AT91C_BASE_TC0->TC_CCR = AT91C_TC_CLKEN | AT91C_TC_SWTRG;
 
             // Start receiving data on the USB
             CDCDSerialDriver_Read(usbBuffer,
