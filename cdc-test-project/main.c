@@ -520,13 +520,13 @@ static void UsbDataReceived(unsigned int unused,
         for (i=0; i<received; i++)
             DBGU_PutChar(usbBuffer[i]);
 
-        // Send data through USART
-        while (!USART_WriteBuffer(AT91C_BASE_US1, usbBuffer, received));
-        AT91C_BASE_US1->US_IER = AT91C_US_TXBUFE;
+        // Loopback
+        static unsigned char outbuf[DATABUFFERSIZE];
+        memcpy(outbuf, usbBuffer, received);
+        while (CDCDSerialDriver_Write(outbuf, received, 0, 0) != USBD_STATUS_SUCCESS);
 
         // Check if bytes have been discarded
         if ((received == DATABUFFERSIZE) && (remaining > 0)) {
-
             TRACE_WARNING(
                       "UsbDataReceived: %u bytes discarded\n\r",
                       remaining);
