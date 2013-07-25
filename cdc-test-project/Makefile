@@ -48,13 +48,14 @@ BOARD = simtrace
 TRACE_LEVEL = 3
 
 # Optimization level, put in comment for debugging
-OPTIMIZATION = -Os
+# OPTIMIZATION = -Os
+OPTIMIZATION = -O0
 
 # AT91 library directory
 AT91LIB = ../at91lib
 
 # Output file basename
-OUTPUT = usb-device-cdc-serial-project-$(BOARD)-$(CHIP)
+OUTPUT = cdc-test-project-$(BOARD)-$(CHIP)
 
 # Compile for all memories available on the board (this sets $(MEMORIES))
 include $(AT91LIB)/boards/$(BOARD)/board.mak

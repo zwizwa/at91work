@@ -47,6 +47,7 @@
 // #include <pmc/pmc.h>
 
 #include <string.h>
+#include <stdint.h>
 
 //-----------------------------------------------------------------------------
 //         Local variables
@@ -154,6 +155,7 @@ int main( void )
 
     /* Init phone ISO7816 USART */
     struct iso7816_slave *s = iso7816_slave_init();
+
 
     /* Comm handler */
     iso7816_slave_mainloop(s);

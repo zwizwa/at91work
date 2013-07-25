@@ -10,7 +10,8 @@
      implementation (e.g. COS).
 
    - Don't write blocking code; Structure as a non-blocking state
-     machine to avoid dependency on platform thread support.
+     machine to avoid dependency on platform thread support, or
+     busy-waiting single-threaded implementation.
 
  */
 
@@ -224,8 +225,8 @@ void iso7816_slave_tick(struct iso7816_slave *s) {
         /**** LOW LEVEL ****/
 
         /* Message transfer */
-    case S_RX: next_io(s, iso7816_port_rx(s->port,  s->io_ptr));    break;
-    case S_TX: next_io(s, iso7816_port_tx(s->port,  s->io_ptr[0])); break;
+    case S_RX: next_io(s, iso7816_port_rx(s->port, s->io_ptr));    break;
+    case S_TX: next_io(s, iso7816_port_tx(s->port, s->io_ptr[0])); break;
 
     default:
         TRACE_DEBUG("unknown state %d\n\r", s->state);

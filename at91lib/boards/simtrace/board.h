@@ -241,6 +241,12 @@
 //------------------------------------------------------------------------------
 
 
+/// USART1 RXD pin definition (PA21).
+#define PIN_USART1_RXD  {1 << 21, AT91C_BASE_PIOA, AT91C_ID_PIOA, PIO_PERIPH_A, PIO_DEFAULT}
+/// USART1 TXD pin definition (PA22).
+#define PIN_USART1_TXD  {1 << 22, AT91C_BASE_PIOA, AT91C_ID_PIOA, PIO_PERIPH_A, PIO_DEFAULT}
+
+
 // disabled: pcscd doesn't like this
 //#define BOARD_USB_DFU
 
