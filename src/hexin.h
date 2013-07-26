@@ -24,7 +24,7 @@ static int hexin_digit(char c) {
 }
 static inline void hexin_print(struct hexin *r) {
     int i;
-    printf("#");
+    printf("hexin:");
     for (i = 0 ; i<hexin_length(r); i++) {
         printf("%02X", r->buf[i]);
     }

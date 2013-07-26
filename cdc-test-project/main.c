@@ -335,8 +335,10 @@ static void c_apdu_cb(void *ctx, const uint8_t *buf, int size) {
     for (i = 0; i<size; i++) {
         sprintf(hexout_buf + 2*i, "%02X", buf[i]);
     }
-    sprintf(hexout_buf + 2*size, "\n\r");
-    CDCDSerialDriver_Write(hexout_buf, 2*size+2, 0, 0);
+    // Don't print \r -> python readline() don't like
+    // Got to love that legacy CR/LF stuff..
+    sprintf(hexout_buf + 2*size, "\n");
+    CDCDSerialDriver_Write(hexout_buf, strlen(hexout_buf), 0, 0);
 }
 
 //------------------------------------------------------------------------------
