@@ -15,7 +15,7 @@
 
  */
 
-
+#include "iso7816_slave.h"
 #include <stdint.h>
 #include <string.h>
 #include <utility/trace.h>
@@ -41,8 +41,9 @@ enum iso7816_state {
 
     S_TPDU,
     S_TPDU_PROT,
-    S_TPDU_REQ,
-    S_TPDU_SW,
+    S_TPDU_DATA,
+    S_TPDU_WAIT_REPLY,
+    S_TPDU_REPLY,
     S_TPDU_RESP,
 
     /* RX/TX: io_next contains next state after I/O is done */
@@ -54,6 +55,8 @@ enum iso7816_state {
 
 struct iso7816_slave {
     struct iso7816_port *port;
+    iso7816_slave_c_apdu_t c_apdu_cb;
+    void *c_apdu_ctx;
     enum iso7816_state state;
     enum iso7816_state io_next; // next state after I/O is done
     uint8_t *io_ptr;            // current read(RX) or write(TX) index
@@ -62,7 +65,8 @@ struct iso7816_slave {
         struct tpdu tpdu;
         uint8_t buf[8 + 256];   // receive/send buffer
     } msg;
-    struct sw sw; // response code
+    uint8_t c_apdu_size;  // c_apdu = tpdu header + c_apdu_size bytes
+    uint8_t r_apdu_size;  // r_apdu = r_apdu_size bytes after c_apdu
 };
 
 
@@ -120,6 +124,22 @@ static void next_receive_tpdu_header(struct iso7816_slave *s) {
 
 
 
+
+
+/* Connect to C/R APDU */
+int iso7816_slave_r_apdu(struct iso7816_slave *s, const uint8_t *buf, int size) {
+    if (s->state != S_TPDU_WAIT_REPLY) return -EAGAIN; // not waiting for data
+    if (size != s->r_apdu_size) {
+        TRACE_DEBUG("R-APDU data size incorrect size:%d != p3:%d\n", size, p->tpdu->p3);
+        return -EIO; // FIXME: what should this be?
+    }
+    memcpy(s->msg.buf + s->c_apdu_size, buf, size);
+    s->state = S_TPDU_REPLY;
+    return ENOERR;
+}
+
+
+
 /* Non-blocking state machine for ISO7816, slave side. */
 
 
@@ -131,7 +151,7 @@ void iso7816_slave_tick(struct iso7816_slave *s) {
     /* Monitor RST and VCC */
     if (!(rst && vcc)) {
         if (s->state != S_RESET) {
-            TRACE_DEBUG("%d -> S_RESET\n\r", s->state)
+            TRACE_DEBUG("%d -> S_RESET\n\r", s->state);
             s->state = S_RESET;
         }
     }
@@ -182,38 +202,39 @@ void iso7816_slave_tick(struct iso7816_slave *s) {
         next_send(s, S_TPDU_PROT, &s->msg.tpdu.ins, 1);
         break;
     case S_TPDU_PROT:
-        /* Protocol byte is out.  Based on INS, we either read payload
-           from master and then perform high level APDU request, or we
-           perform request now and send the resulting bytes to
-           master. */
+        /* Protocol byte is out.  Based on INS, we either read command
+           data from master and then perform high level APDU request,
+           or we perform request now and send the resulting response
+           data to master. */
         TRACE_DEBUG("S_TPDU_PROT\n\r");
-        switch(s->msg.tpdu.ins) {
-        case INS_SELECT_FILE:
-            /* Read data from master, then delegate request. */
-            next_receive(s, S_TPDU_REQ, &s->msg.tpdu.data[0], s->msg.tpdu.p3);
-            break;
-        case INS_GET_RESPONSE:
-            /* Delegate request, then send data to master. */
-            apdu_request(&s->msg.tpdu, &s->sw);
-            next_send(s, S_TPDU_SW, &s->msg.tpdu.data[0], s->msg.tpdu.p3);
-            break;
-        default:
-            TRACE_DEBUG("INS %02X not supported\n\r", s->msg.tpdu.ins);
-            TRACE_DEBUG("TPDU: %02X %02X %02X %02X %02X\n\r",
-                        s->msg.buf[0], s->msg.buf[1], s->msg.buf[2],
-                        s->msg.buf[3], s->msg.buf[4]);
-            s->state = S_INIT;
-            break;
+        if (INS_GET_RESPONSE == s->msg.tpdu.ins) {
+            s->c_apdu_size = sizeof(struct tpdu);
+            s->r_apdu_size = s->msg.tpdu.p3 + 2;
         }
+        else {
+            s->c_apdu_size = sizeof(struct tpdu) + s->msg.tpdu.p3;
+            s->r_apdu_size = 2;
+        }
+        next_receive(s, S_TPDU_DATA, &s->msg.tpdu.data[0],
+                     s->c_apdu_size - sizeof(struct tpdu));
         break;
-    case S_TPDU_REQ:
-        TRACE_DEBUG("S_TPDU_REQ\n\r");
-        apdu_request(&s->msg.tpdu, &s->sw);
-        // fallthrough
-    case S_TPDU_SW:
-        /* TPDU data is transferred.  Send SW1:SW2. */
-        TRACE_DEBUG("S_TPDU_SW\n\r");
-        next_send(s, S_TPDU_RESP, &s->sw.sw1, sizeof(s->sw));
+
+    case S_TPDU_DATA:
+        /* All C-APDU data is in.  Pass it to handler. */
+        TRACE_DEBUG("S_TPDU_DATA_IN\n\r");
+        s->c_apdu_cb(s->c_apdu_ctx, (uint8_t *)&s->msg.tpdu, s->c_apdu_size);
+        s->state = S_TPDU_WAIT_REPLY;
+        break;
+    case S_TPDU_WAIT_REPLY:
+        /* Waiting for data provided by is7816_slave_r_apdu() */
+        break;
+    case S_TPDU_REPLY:
+        TRACE_DEBUG("S_TPDU_REPLY\n\r");
+        /* Send response data + SW */
+        next_send(s, S_TPDU_RESP,
+                  &s->msg.tpdu.data[0],
+                  (INS_GET_RESPONSE == s->msg.tpdu.ins ? s->msg.tpdu.p3 : 0)
+                  + 2); // SW1:SW2
         break;
     case S_TPDU_RESP:
         /* Response sent, wait for next TPDU */
@@ -237,6 +258,8 @@ void iso7816_slave_tick(struct iso7816_slave *s) {
 
 
 
+
+
 void iso7816_slave_mainloop(struct iso7816_slave *s) {
     s->state = S_INIT;
     while(1) iso7816_slave_tick(s);
@@ -248,9 +271,11 @@ void iso7816_slave_mainloop(struct iso7816_slave *s) {
 
 static struct iso7816_slave phone;
 
-struct iso7816_slave *iso7816_slave_init(void) {
-    struct iso7816_slave *p = &phone;
-    p->port = iso7816_port_init(1);
-    return p;
+struct iso7816_slave *iso7816_slave_init(iso7816_slave_c_apdu_t c_apdu_cb, void *c_apdu_ctx) {
+    struct iso7816_slave *s = &phone;
+    s->c_apdu_cb  = c_apdu_cb;
+    s->c_apdu_ctx = c_apdu_ctx;
+    s->port = iso7816_port_init(1);
+    return s;
 }
 

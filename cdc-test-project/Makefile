@@ -78,7 +78,7 @@ SIZE = $(CROSS_COMPILE)size
 OBJCOPY = $(CROSS_COMPILE)objcopy
 
 # Flags
-INCLUDES = -I$(AT91LIB)/boards/$(BOARD) -I$(AT91LIB)/peripherals 
+INCLUDES = -I$(AT91LIB)/boards/$(BOARD) -I$(AT91LIB)/peripherals -I../src
 INCLUDES += -I$(AT91LIB)/components -I$(AT91LIB)/usb/device -I$(AT91LIB)
 
 CFLAGS = -Wall -mlong-calls -ffunction-sections
@@ -103,6 +103,7 @@ VPATH += $(UTILITY)
 VPATH += $(PERIPH)/dbgu $(PERIPH)/aic $(PERIPH)/usart $(PERIPH)/pio $(PERIPH)/pmc
 VPATH += $(PERIPH)/cp15
 VPATH += $(BOARDS)/$(BOARD) $(BOARDS)/$(BOARD)/$(CHIP)
+VPATH += ../src
 
 # Objects built from C source files
 C_OBJECTS = main.o
@@ -122,6 +123,7 @@ C_OBJECTS += USBEndpointDescriptor.o USBConfigurationDescriptor.o
 C_OBJECTS += led.o string.o stdio.o
 C_OBJECTS += aic.o dbgu.o usart.o pio.o pio_it.o pmc.o cp15.o
 C_OBJECTS += board_memories.o board_lowlevel.o
+C_OBJECTS += iso7816_at91.o iso7816_slave.o apdu.o
 
 # Objects built from Assembly source files
 ASM_OBJECTS = board_cstartup.o

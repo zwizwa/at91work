@@ -121,9 +121,6 @@ void NormalPowerMode(void)
 
 }
 
-struct iso7816_slave;
-struct iso7816_slave *iso7816_slave_init(void);
-void iso7816_slave_mainloop(struct iso7816_slave *p);
 
 
 //------------------------------------------------------------------------------

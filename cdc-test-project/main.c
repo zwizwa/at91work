@@ -156,6 +156,10 @@
 #include <usb/device/cdc-serial/CDCDSerialDriver.h>
 #include <usb/device/cdc-serial/CDCDSerialDriverDescriptors.h>
 #include <pmc/pmc.h>
+#include <string.h>
+#include "hexin.h"
+#include "iso7816_slave.h"
+
 
 //------------------------------------------------------------------------------
 //      Definitions
@@ -191,176 +195,9 @@ static unsigned char usbBuffer[DATABUFFERSIZE];
 //------------------------------------------------------------------------------
 //         VBus monitoring (optional)
 //------------------------------------------------------------------------------
-#if defined(PIN_USB_VBUS)
 
-#define VBUS_CONFIGURE()  VBus_Configure()
+#define VBUS_CONFIGURE()    USBD_Connect()
 
-/// VBus pin instance.
-static const Pin pinVbus = PIN_USB_VBUS;
-
-//------------------------------------------------------------------------------
-/// Handles interrupts coming from PIO controllers.
-//------------------------------------------------------------------------------
-static void ISR_Vbus(const Pin *pPin)
-{
-    // Check current level on VBus
-    if (PIO_Get(&pinVbus)) {
-
-        TRACE_INFO("VBUS conn\n\r");
-        USBD_Connect();
-    }
-    else {
-
-        TRACE_INFO("VBUS discon\n\r");
-        USBD_Disconnect();
-    }
-}
-
-//------------------------------------------------------------------------------
-/// Configures the VBus pin to trigger an interrupt when the level on that pin
-/// changes.
-//------------------------------------------------------------------------------
-static void VBus_Configure( void )
-{
-    TRACE_INFO("VBus configuration\n\r");
-
-    // Configure PIO
-    PIO_Configure(&pinVbus, 1);
-    PIO_ConfigureIt(&pinVbus, ISR_Vbus);
-    PIO_EnableIt(&pinVbus);
-
-    // Check current level on VBus
-    if (PIO_Get(&pinVbus)) {
-
-        // if VBUS present, force the connect
-        TRACE_INFO("VBUS conn\n\r");
-        USBD_Connect();
-    }
-    else {
-        USBD_Disconnect();
-    }           
-}
-
-#else
-    #define VBUS_CONFIGURE()    USBD_Connect()
-#endif //#if defined(PIN_USB_VBUS)
-
-#if defined (CP15_PRESENT)
-//------------------------------------------------------------------------------
-/// Put the CPU in 32kHz, disable PLL, main oscillator
-/// Put voltage regulator in standby mode
-//------------------------------------------------------------------------------
-void LowPowerMode(void)
-{
-    PMC_CPUInIdleMode();
-}
-//------------------------------------------------------------------------------
-/// Put voltage regulator in normal mode
-/// Return the CPU to normal speed 48MHz, enable PLL, main oscillator
-//------------------------------------------------------------------------------
-void NormalPowerMode(void)
-{
-}
-
-#elif defined(at91sam7a3)
-//------------------------------------------------------------------------------
-/// Put the CPU in 32kHz, disable PLL, main oscillator
-//------------------------------------------------------------------------------
-void LowPowerMode(void)
-{
-    // MCK=48MHz to MCK=32kHz
-    // MCK = SLCK/2 : change source first from 48 000 000 to 18. / 2 = 9M
-    AT91C_BASE_PMC->PMC_MCKR = AT91C_PMC_PRES_CLK_2;
-    while( !( AT91C_BASE_PMC->PMC_SR & AT91C_PMC_MCKRDY ) );
-    // MCK=SLCK : then change prescaler
-    AT91C_BASE_PMC->PMC_MCKR = AT91C_PMC_CSS_SLOW_CLK;
-    while( !( AT91C_BASE_PMC->PMC_SR & AT91C_PMC_MCKRDY ) );
-    // disable PLL
-    AT91C_BASE_PMC->PMC_PLLR = 0;
-    // Disable Main Oscillator
-    AT91C_BASE_PMC->PMC_MOR = 0;
-
-    PMC_DisableProcessorClock();
-}
-//------------------------------------------------------------------------------
-/// Return the CPU to normal speed 48MHz, enable PLL, main oscillator
-//------------------------------------------------------------------------------
-void NormalPowerMode(void)
-{
-    // MCK=32kHz to MCK=48MHz
-    // enable Main Oscillator
-    AT91C_BASE_PMC->PMC_MOR = (( (AT91C_CKGR_OSCOUNT & (0x06 <<8)) | AT91C_CKGR_MOSCEN ));
-    while( !( AT91C_BASE_PMC->PMC_SR & AT91C_PMC_MOSCS ) );
-
-    // enable PLL@96MHz
-    AT91C_BASE_PMC->PMC_PLLR = ((AT91C_CKGR_DIV & 0x0E) |
-         (AT91C_CKGR_PLLCOUNT & (28<<8)) |
-         (AT91C_CKGR_MUL & (0x48<<16)));
-    while( !( AT91C_BASE_PMC->PMC_SR & AT91C_PMC_LOCK ) );
-    while( !( AT91C_BASE_PMC->PMC_SR & AT91C_PMC_MCKRDY ) );
-    AT91C_BASE_CKGR->CKGR_PLLR |= AT91C_CKGR_USBDIV_1 ;
-    // MCK=SLCK/2 : change prescaler first
-    AT91C_BASE_PMC->PMC_MCKR = AT91C_PMC_PRES_CLK_2;
-    while( !( AT91C_BASE_PMC->PMC_SR & AT91C_PMC_MCKRDY ) );
-    // MCK=PLLCK/2 : then change source
-    AT91C_BASE_PMC->PMC_MCKR |= AT91C_PMC_CSS_PLL_CLK  ;
-    while( !( AT91C_BASE_PMC->PMC_SR & AT91C_PMC_MCKRDY ) );
-}
-
-#elif defined (at91sam7se)
-//------------------------------------------------------------------------------
-/// Put the CPU in 32kHz, disable PLL, main oscillator
-/// Put voltage regulator in standby mode
-//------------------------------------------------------------------------------
-void LowPowerMode(void)
-{
-    // MCK=48MHz to MCK=32kHz
-    // MCK = SLCK/2 : change source first from 48 000 000 to 18. / 2 = 9M
-    AT91C_BASE_PMC->PMC_MCKR = AT91C_PMC_PRES_CLK_2;
-    while( !( AT91C_BASE_PMC->PMC_SR & AT91C_PMC_MCKRDY ) );
-    // MCK=SLCK : then change prescaler
-    AT91C_BASE_PMC->PMC_MCKR = AT91C_PMC_CSS_SLOW_CLK;
-    while( !( AT91C_BASE_PMC->PMC_SR & AT91C_PMC_MCKRDY ) );
-    // disable PLL
-    AT91C_BASE_PMC->PMC_PLLR = 0;
-    // Disable Main Oscillator
-    AT91C_BASE_PMC->PMC_MOR = 0;
-
-    // Voltage regulator in standby mode : Enable VREG Low Power Mode
-    AT91C_BASE_VREG->VREG_MR |= AT91C_VREG_PSTDBY;
-
-    PMC_DisableProcessorClock();
-}
-//------------------------------------------------------------------------------
-/// Put voltage regulator in normal mode
-/// Return the CPU to normal speed 48MHz, enable PLL, main oscillator
-//------------------------------------------------------------------------------
-void NormalPowerMode(void)
-{
-    // Voltage regulator in normal mode : Disable VREG Low Power Mode
-    AT91C_BASE_VREG->VREG_MR &= ~AT91C_VREG_PSTDBY;
-
-    // MCK=32kHz to MCK=48MHz
-    // enable Main Oscillator
-    AT91C_BASE_PMC->PMC_MOR = (( (AT91C_CKGR_OSCOUNT & (0x06 <<8)) | AT91C_CKGR_MOSCEN ));
-    while( !( AT91C_BASE_PMC->PMC_SR & AT91C_PMC_MOSCS ) );
-
-    // enable PLL@96MHz
-    AT91C_BASE_PMC->PMC_PLLR = ((AT91C_CKGR_DIV & 0x0E) |
-         (AT91C_CKGR_PLLCOUNT & (28<<8)) |
-         (AT91C_CKGR_MUL & (0x48<<16)));
-    while( !( AT91C_BASE_PMC->PMC_SR & AT91C_PMC_LOCK ) );
-    while( !( AT91C_BASE_PMC->PMC_SR & AT91C_PMC_MCKRDY ) );
-    AT91C_BASE_CKGR->CKGR_PLLR |= AT91C_CKGR_USBDIV_1 ;
-    // MCK=SLCK/2 : change prescaler first
-    AT91C_BASE_PMC->PMC_MCKR = AT91C_PMC_PRES_CLK_2;
-    while( !( AT91C_BASE_PMC->PMC_SR & AT91C_PMC_MCKRDY ) );
-    // MCK=PLLCK/2 : then change source
-    AT91C_BASE_PMC->PMC_MCKR |= AT91C_PMC_CSS_PLL_CLK  ;
-    while( !( AT91C_BASE_PMC->PMC_SR & AT91C_PMC_MCKRDY ) );
-}
-
-#elif defined (at91sam7s)
 //------------------------------------------------------------------------------
 /// Put the CPU in 32kHz, disable PLL, main oscillator
 /// Put voltage regulator in standby mode
@@ -414,67 +251,6 @@ void NormalPowerMode(void)
     while( !( AT91C_BASE_PMC->PMC_SR & AT91C_PMC_MCKRDY ) );
 
 }
-
-#elif defined (at91sam7x) || defined (at91sam7xc)
-//------------------------------------------------------------------------------
-/// Put the CPU in 32kHz, disable PLL, main oscillator
-/// Put voltage regulator in standby mode
-//------------------------------------------------------------------------------
-void LowPowerMode(void)
-{
-    // MCK=48MHz to MCK=32kHz
-    // MCK = SLCK/2 : change source first from 48 000 000 to 18. / 2 = 9M
-    AT91C_BASE_PMC->PMC_MCKR = AT91C_PMC_PRES_CLK_2;
-    while( !( AT91C_BASE_PMC->PMC_SR & AT91C_PMC_MCKRDY ) );
-    // MCK=SLCK : then change prescaler
-    AT91C_BASE_PMC->PMC_MCKR = AT91C_PMC_CSS_SLOW_CLK;
-    while( !( AT91C_BASE_PMC->PMC_SR & AT91C_PMC_MCKRDY ) );
-    // disable PLL
-    AT91C_BASE_PMC->PMC_PLLR = 0;
-    // Disable Main Oscillator
-    AT91C_BASE_PMC->PMC_MOR = 0;
-
-    // Voltage regulator in standby mode : Enable VREG Low Power Mode
-    AT91C_BASE_VREG->VREG_MR |= AT91C_VREG_PSTDBY;
-
-    PMC_DisableProcessorClock();
-}
-
-//------------------------------------------------------------------------------
-/// Put voltage regulator in normal mode
-/// Return the CPU to normal speed 48MHz, enable PLL, main oscillator
-//------------------------------------------------------------------------------
-void NormalPowerMode(void)
-{
-    // Voltage regulator in normal mode : Disable VREG Low Power Mode
-    AT91C_BASE_VREG->VREG_MR &= ~AT91C_VREG_PSTDBY;
-
-    // MCK=32kHz to MCK=48MHz
-    // enable Main Oscillator
-    AT91C_BASE_PMC->PMC_MOR = (( (AT91C_CKGR_OSCOUNT & (0x06 <<8)) | AT91C_CKGR_MOSCEN ));
-    while( !( AT91C_BASE_PMC->PMC_SR & AT91C_PMC_MOSCS ) );
-
-    // enable PLL@96MHz
-    AT91C_BASE_PMC->PMC_PLLR = ((AT91C_CKGR_DIV & 0x0E) |
-         (AT91C_CKGR_PLLCOUNT & (28<<8)) |
-         (AT91C_CKGR_MUL & (0x48<<16)));
-    while( !( AT91C_BASE_PMC->PMC_SR & AT91C_PMC_LOCK ) );
-    while( !( AT91C_BASE_PMC->PMC_SR & AT91C_PMC_MCKRDY ) );
-    AT91C_BASE_CKGR->CKGR_PLLR |= AT91C_CKGR_USBDIV_1 ;
-    // MCK=SLCK/2 : change prescaler first
-    AT91C_BASE_PMC->PMC_MCKR = AT91C_PMC_PRES_CLK_2;
-    while( !( AT91C_BASE_PMC->PMC_SR & AT91C_PMC_MCKRDY ) );
-    // MCK=PLLCK/2 : then change source
-    AT91C_BASE_PMC->PMC_MCKR |= AT91C_PMC_CSS_PLL_CLK  ;
-    while( !( AT91C_BASE_PMC->PMC_SR & AT91C_PMC_MCKRDY ) );
-}
-
-#endif
-
-//------------------------------------------------------------------------------
-//         Internal functions
-//------------------------------------------------------------------------------
-
 
 
 //------------------------------------------------------------------------------
@@ -506,6 +282,11 @@ void USBDCallbacks_Suspended(void)
 }
 
 
+static uint8_t hexin_buf[256];
+static struct hexin h = {.buf = hexin_buf};
+static struct iso7816_slave *iso7816_slave;
+
+
 //------------------------------------------------------------------------------
 /// Callback invoked when data has been received on the USB.
 //------------------------------------------------------------------------------
@@ -517,13 +298,13 @@ static void UsbDataReceived(unsigned int unused,
     // Check that data has been received successfully
     if (status == USBD_STATUS_SUCCESS) {
         int i;
-        for (i=0; i<received; i++)
-            DBGU_PutChar(usbBuffer[i]);
-
-        // Loopback
-        static unsigned char outbuf[DATABUFFERSIZE];
-        memcpy(outbuf, usbBuffer, received);
-        while (CDCDSerialDriver_Write(outbuf, received, 0, 0) != USBD_STATUS_SUCCESS);
+        for (i=0; i<received; i++) {
+            int rv = hexin_push(&h, usbBuffer[i]);
+            if (rv > 0) {
+                iso7816_slave_r_apdu(iso7816_slave, hexin_buf, rv);
+                hexin_reset(&h);
+            }
+        }
 
         // Check if bytes have been discarded
         if ((received == DATABUFFERSIZE) && (remaining > 0)) {
@@ -543,6 +324,19 @@ static void UsbDataReceived(unsigned int unused,
                           DATABUFFERSIZE,
                           (TransferCallback) UsbDataReceived,
                           0);
+}
+
+
+/* Poor man's delegation: print in HEX on the terminal. */
+static char hexout_buf[256];
+
+static void c_apdu_cb(void *ctx, const uint8_t *buf, int size) {
+    int i;
+    for (i = 0; i<size; i++) {
+        sprintf(hexout_buf + 2*i, "%02X", buf[i]);
+    }
+    sprintf(hexout_buf + 2*size, "\n\r");
+    CDCDSerialDriver_Write(hexout_buf, 2*size+2, 0, 0);
 }
 
 //------------------------------------------------------------------------------
@@ -569,8 +363,13 @@ int main()
     // connect if needed
     VBUS_CONFIGURE();
 
+    /* Init phone ISO7816 USART */
+    iso7816_slave = iso7816_slave_init(c_apdu_cb, NULL);
+
     // Driver loop
     while (1) {
+        // Poll I/O state machine.
+        iso7816_slave_tick(iso7816_slave);
 
         // Device is not configured
         if (USBD_GetState() < USBD_STATE_CONFIGURED) {
