@@ -60,7 +60,7 @@ static int iso7816_port_status(struct iso7816_port *p) {
     uint32_t csr = p->usart->US_CSR;
     uint32_t status = mask & csr;
     if (status != 0) {
-        TRACE_DEBUG("csr: %08x %08x\n\r", csr, status);
+        TRACE_ERROR("csr: %08x %08x\n\r", csr, status);
         p->usart->US_CR = AT91C_US_RSTSTA | AT91C_US_RSTNACK;
         return -EIO; // FIXME: more descriptive?
     }

@@ -204,16 +204,19 @@ void iso7816_slave_tick(struct iso7816_slave *s) {
         next_send(s, S_TPDU_PROT, &s->msg.tpdu.ins, 1);
         break;
     case S_TPDU_PROT:
-        /* Protocol byte is out.  Based on INS, we either read command
-           data from master and then perform high level APDU request,
-           or we perform request now and send the resulting response
-           data to master. */
+        /* Protocol byte is out.
+           P3 contains data size, INS determines direction. */
         TRACE_WARN("S_TPDU_PROT\n\r");
-        if (INS_GET_RESPONSE == s->msg.tpdu.ins) {
+        switch(s->msg.tpdu.ins) {
+        case INS_GET_RESPONSE:
+        case INS_READ_BINARY:
+        case INS_STATUS:
+            /* data in R-APDU */
             s->c_apdu_size = sizeof(struct tpdu);
             s->r_apdu_size = s->msg.tpdu.p3 + 2;
-        }
-        else {
+            break;
+        default:
+            /* data in C-APDU */
             s->c_apdu_size = sizeof(struct tpdu) + s->msg.tpdu.p3;
             s->r_apdu_size = 2;
         }
@@ -228,11 +231,11 @@ void iso7816_slave_tick(struct iso7816_slave *s) {
         s->state = S_TPDU_WAIT_REPLY;
         break;
     case S_TPDU_WAIT_REPLY:
-        /* Waiting for data provided by is7816_slave_r_apdu() */
+        /* Wait for data provided by is7816_slave_r_apdu() */
         break;
     case S_TPDU_REPLY:
-        TRACE_WARN("S_TPDU_REPLY\n\r");
         /* Send response data + SW */
+        TRACE_WARN("S_TPDU_REPLY\n\r");
         next_send(s, S_TPDU_RESP,
                   s->msg.buf + s->c_apdu_size,
                   s->r_apdu_size);
