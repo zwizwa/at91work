@@ -328,17 +328,40 @@ static void UsbDataReceived(unsigned int unused,
 
 
 /* Poor man's delegation: print in HEX on the terminal. */
-static char hexout_buf[256];
+static char hexout_buf[DATABUFFERSIZE];
 
-static void c_apdu_cb(void *ctx, const uint8_t *buf, int size) {
-    int i;
-    for (i = 0; i<size; i++) {
-        sprintf(hexout_buf + 2*i, "%02X", buf[i]);
+/* Transfer next chunk of HEX data until done. */
+static void UsbDataSent(unsigned int unused,
+                        unsigned char status,
+                        unsigned int sent,
+                        unsigned int remaining)
+{
+    // FIXME: handle errors.  Function args are ignored.
+
+    int char_index = 0;
+    int rv = 0;
+    while((char_index < (DATABUFFERSIZE-1)) &&
+          ((rv = iso7816_slave_c_apdu_read(iso7816_slave)) >= 0)) {
+        sprintf(hexout_buf + char_index, "%02X", (uint8_t)rv);
+        char_index += 2;
     }
-    // Don't print \r -> python readline() don't like
-    // Got to love that legacy CR/LF stuff..
-    sprintf(hexout_buf + 2*size, "\n");
-    CDCDSerialDriver_Write(hexout_buf, strlen(hexout_buf), 0, 0);
+    TransferCallback callback;
+    if (rv < 0) {
+        // Don't print \r -> python readline() don't like
+        // Got to love that legacy CR/LF stuff..
+        sprintf(hexout_buf + char_index, "\n");
+        callback = NULL;
+    }
+    else {
+        // Send more later.
+        callback = UsbDataSent;
+    }
+    CDCDSerialDriver_Write(hexout_buf, strlen(hexout_buf),
+                           callback, 0);
+}
+
+static void c_apdu_cb(void *ctx, int size) {
+    UsbDataSent(0, 0, 0, 0);
 }
 
 //------------------------------------------------------------------------------

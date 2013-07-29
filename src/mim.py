@@ -42,7 +42,7 @@ def c_apdu():
     return str
 
 def r_apdu(str):
-    sys.stderr.write("R-APDU:%s\n" % str)
+    sys.stderr.write("R-APDU:%s\n\n" % str)
     sys.stdout.write("%s\n" % str)
     sys.stdout.flush()
 

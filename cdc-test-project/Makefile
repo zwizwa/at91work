@@ -123,7 +123,7 @@ C_OBJECTS += USBEndpointDescriptor.o USBConfigurationDescriptor.o
 C_OBJECTS += led.o string.o stdio.o
 C_OBJECTS += aic.o dbgu.o usart.o pio.o pio_it.o pmc.o cp15.o
 C_OBJECTS += board_memories.o board_lowlevel.o
-C_OBJECTS += iso7816_at91.o iso7816_slave.o apdu.o
+C_OBJECTS += iso7816_at91.o iso7816_slave.o
 
 # Objects built from Assembly source files
 ASM_OBJECTS = board_cstartup.o

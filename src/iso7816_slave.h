@@ -15,8 +15,11 @@
 
 struct iso7816_slave;
 
-// Callback to send C-APDU packet to transport.
-typedef void (*iso7816_slave_c_apdu_t)(void *ctx, const uint8_t *buf, int size);
+// Callback to initiate C-APDU packet transfer.
+typedef void (*iso7816_slave_c_apdu_t)(void *ctx, int size);
+// Obtain next C-APDU byte.  rv >= 0 is byte, other is EOF.
+int iso7816_slave_c_apdu_read(struct iso7816_slave *s);
+
 
 // Send R-APDU to serial port.
 int iso7816_slave_r_apdu(struct iso7816_slave *s, const uint8_t *buf, int size);

@@ -20,13 +20,61 @@
 #include <string.h>
 #include <utility/trace.h>
 #include "errno.h"
-#include "apdu.h"
 
 #ifndef TRACE_WARN
 #define TRACE_WARN printf
 #endif
 
 #include "iso7816_port.h"
+
+
+// FIXME: share with master
+enum iso7816_ins {
+    INS_DEACTIVATE_FILE        = 0x04,
+    INS_ERASE_BINARY           = 0x0E,
+    INS_TERMINAL_PROFILE       = 0x10,
+    INS_FETCH                  = 0x12,
+    INS_TERMINAL_RESPONSE      = 0x14,
+    INS_VERIFY                 = 0x20,
+    INS_CHANGE_PIN             = 0x24,
+    INS_DISABLE_PIN            = 0x26,
+    INS_ENABLE_PIN             = 0x28,
+    INS_UNBLOCK_PIN            = 0x2C,
+    INS_INCREASE               = 0x32,
+    INS_ACTIVATE_FILE          = 0x44,
+    INS_MANAGE_CHANNEL         = 0x70,
+    INS_MANAGE_SECURE_CHANNEL  = 0x73,
+    INS_TRANSACT_DATA          = 0x75,
+    INS_EXTERNAL_AUTHOENTICATE = 0x82,
+    INS_GET_CHALLENGE          = 0x84,
+    INS_INTERNAL_AUTHENTICATE  = 0x88, // also 0x89 ??
+    INS_SEARCH_RECORD          = 0xA2,
+    INS_SELECT_FILE            = 0xA4,
+    INS_TERMINAL_CAPABILITY    = 0xAA,
+    INS_READ_BINARY            = 0xB0,
+    INS_READ_RECORD            = 0xB2,
+    INS_GET_RESPONSE           = 0xC0,   /* Transmission-oriented APDU */
+    INS_ENVELOPE               = 0xC2,
+    INS_RETRIEVE_DATA          = 0xCB,
+    INS_GET_DATA               = 0xCA,
+    INS_WRITE_BINARY           = 0xD0,
+    INS_WRITE_RECORD           = 0xD2,
+    INS_UPDATE_BINARY          = 0xD6,
+    INS_PUT_DATA               = 0xDA,
+    INS_SET_DATA               = 0xDB,
+    INS_UPDATE_DATA            = 0xDC,
+    INS_APPEND_RECORD          = 0xE2,
+    INS_STATUS                 = 0xF2,
+};
+// FIXME: share with master
+struct tpdu {
+    uint8_t cla;
+    uint8_t ins;
+    uint8_t p1;
+    uint8_t p2;
+    uint8_t p3;
+    uint8_t data[];
+} __attribute__((__packed__));
 
 
 /* BYTE-LEVEL SLAVE-SIDE PROTOCOL */
@@ -67,6 +115,7 @@ struct iso7816_slave {
     } msg;
     uint8_t c_apdu_size;  // c_apdu = tpdu header + c_apdu_size bytes
     uint8_t r_apdu_size;  // r_apdu = r_apdu_size bytes after c_apdu
+    int skip_reset;
 };
 
 
@@ -123,6 +172,22 @@ static void next_receive_tpdu_header(struct iso7816_slave *s) {
 
 
 
+int iso7816_slave_c_apdu_read(struct iso7816_slave *s) {
+    /* During the request delegation phase, we only provide C-APDU
+     * bytes.  Delegate will call iso7816_slave_r_apdu() to continue
+     * processing. */
+    if (s->state != S_TPDU_WAIT_REPLY) {
+        TRACE_ERROR("iso7816_slave_c_apdu_read state %d\n", s->state);
+        return -EIO;
+    }
+    if (s->io_ptr >= (s->msg.buf + s->c_apdu_size)) {
+        return -EIO; // FIXME: what error to use?
+    }
+    else {
+        return *(s->io_ptr)++;
+    }
+}
+
 
 
 
@@ -150,10 +215,12 @@ void iso7816_slave_tick(struct iso7816_slave *s) {
     int rst, vcc;
     iso7816_port_get_rst_vcc(s->port, &rst, &vcc);
 
+    // vcc = 1; // HACK: effectively ignore VCC, just look at RST
+
     /* Monitor RST and VCC */
     if (!(rst && vcc)) {
         if (s->state != S_RESET) {
-            TRACE_WARN("%d -> S_RESET\n\r", s->state);
+            TRACE_WARN("%d -> S_RESET VCC:%d RST:%d\n\r", s->state, vcc, rst);
             s->state = S_RESET;
         }
     }
@@ -170,11 +237,19 @@ void iso7816_slave_tick(struct iso7816_slave *s) {
     case S_RESET: {
         /* Boot sync: wait for RST release. */
         if (rst && vcc) {
-            TRACE_WARN("S_RESET -> S_ATR\n\r");
-            static const uint8_t atr[] =
-                {0x3B, 0x98, 0x96, 0x00, 0x93, 0x94,
-                 0x03, 0x08, 0x05, 0x03, 0x03, 0x03};
-            next_send(s, S_ATR, atr, sizeof(atr));
+            if (s->skip_reset) {
+                s->skip_reset--;
+                TRACE_WARN("Skipping reset (%d more)\n\r", s->skip_reset);
+                s->state = S_INIT;
+            }
+            else {
+                TRACE_WARN("S_RESET -> S_ATR\n\r");
+                s->port = iso7816_port_init(1);
+                static const uint8_t atr[] =
+                    {0x3B, 0x98, 0x96, 0x00, 0x93, 0x94,
+                     0x03, 0x08, 0x05, 0x03, 0x03, 0x03};
+                next_send(s, S_ATR, atr, sizeof(atr));
+            }
         }
         break;
     }
@@ -227,8 +302,9 @@ void iso7816_slave_tick(struct iso7816_slave *s) {
     case S_TPDU_DATA:
         /* All C-APDU data is in.  Pass it to handler. */
         TRACE_WARN("S_TPDU_DATA\n\r");
-        s->c_apdu_cb(s->c_apdu_ctx, (uint8_t *)&s->msg.tpdu, s->c_apdu_size);
         s->state = S_TPDU_WAIT_REPLY;
+        s->io_ptr = s->msg.buf;
+        s->c_apdu_cb(s->c_apdu_ctx, s->c_apdu_size);
         break;
     case S_TPDU_WAIT_REPLY:
         /* Wait for data provided by is7816_slave_r_apdu() */
@@ -272,6 +348,7 @@ struct iso7816_slave *iso7816_slave_init(iso7816_slave_c_apdu_t c_apdu_cb, void 
     s->c_apdu_ctx = c_apdu_ctx;
     s->port = iso7816_port_init(1);
     s->state = S_INIT;
+    s->skip_reset = 1;
     return s;
 }
 
