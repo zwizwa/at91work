@@ -342,6 +342,9 @@ void iso7816_slave_tick(struct iso7816_slave *s) {
             int fidi = compute_fidi_ratio(fi, di);
             iso7816_port_set_fidi(s->port, fidi);
         }
+        else {
+            TRACE_WARN("No FIDI set.\n\r");
+        }
         next_receive_tpdu_header(s);
         break;
 

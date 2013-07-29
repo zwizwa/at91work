@@ -96,7 +96,7 @@ int iso7816_port_rx(struct iso7816_port *p, uint8_t *c) {
 
 void iso7816_port_set_fidi(struct iso7816_port *p, uint32_t fidi) {
     if (fidi > 0 && fidi < 0x400) {
-        TRACE_DEBUG("FiDi ratio %d", fidi);
+        TRACE_DEBUG("FiDi ratio %d\n\r", fidi);
 
         /* make sure UART uses new F/D ratio */
         p->usart->US_CR |= AT91C_US_RXDIS | AT91C_US_RSTRX;
@@ -106,7 +106,7 @@ void iso7816_port_set_fidi(struct iso7816_port *p, uint32_t fidi) {
         /* notify ETU timer about this */
         //tc_etu_set_etu(rc);  // FIXME: implement ETU timer!
     } else {
-        TRACE_ERROR("FiDi ratio %d unsupported", fidi);
+        TRACE_ERROR("FiDi ratio %d unsupported\n\r", fidi);
     }
 }
 

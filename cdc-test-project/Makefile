@@ -49,7 +49,7 @@ TRACE_LEVEL = 3
 
 # Optimization level, put in comment for debugging
 # OPTIMIZATION = -Os
-OPTIMIZATION = -O0
+OPTIMIZATION = -O0 -Wno-format -Werror
 
 # AT91 library directory
 AT91LIB = ../at91lib
