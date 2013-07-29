@@ -285,8 +285,10 @@ void iso7816_slave_tick(struct iso7816_slave *s) {
         switch(s->msg.tpdu.ins) {
         case INS_GET_RESPONSE:
         case INS_READ_BINARY:
+        case INS_READ_RECORD:
         case INS_STATUS:
             /* data in R-APDU */
+            /* FIXME: there are probably more..  Go over specs */
             s->c_apdu_size = sizeof(struct tpdu);
             s->r_apdu_size = s->msg.tpdu.p3 + 2;
             break;
