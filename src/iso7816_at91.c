@@ -96,7 +96,7 @@ int iso7816_port_rx(struct iso7816_port *p, uint8_t *c) {
 
 void iso7816_port_set_fidi(struct iso7816_port *p, uint32_t fidi) {
     if (fidi > 0 && fidi < 0x400) {
-        TRACE_DEBUG("FiDi ratio %d\n\r", fidi);
+        TRACE_WARNING("FiDi ratio %d\n\r", fidi);
 
         /* make sure UART uses new F/D ratio */
         p->usart->US_CR |= AT91C_US_RXDIS | AT91C_US_RSTRX;
@@ -209,9 +209,6 @@ struct iso7816_port *iso7816_port_init(int port_nb) {
 
     /* Config USART peripheral in iso7816 mode, slave to external clock. */
     init_usart(phone.usart, AT91C_US_CLKS_EXT);
-
-    /* Set ATR clock div to 372 */
-    iso7816_port_set_fidi(&phone, 372);
 
     return &phone;
 }

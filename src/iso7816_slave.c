@@ -21,8 +21,8 @@
 #include <utility/trace.h>
 #include "errno.h"
 
-#ifndef TRACE_WARN
-#define TRACE_WARN printf
+#ifndef TRACE_WARNING
+#define TRACE_WARNING printf
 #endif
 
 #include "iso7816_port.h"
@@ -184,7 +184,7 @@ static void next_io_start(struct iso7816_slave *s,
     else {
         s->state = transfer_state;
         s->io_next = io_next;
-        s->io_ptr = buf ? buf : s->msg.buf;
+        s->io_ptr = buf;
         s->io_endx = s->io_ptr + size;
     }
 }
@@ -213,7 +213,7 @@ static void next_io(struct iso7816_slave *s, int rv) {
         }
         break;
     default:
-        TRACE_WARN("i/o error %d\n\r", rv);
+        TRACE_WARNING("i/o error %d\n\r", rv);
         s->state = S_RESET;
         break;
     }
@@ -247,10 +247,10 @@ int iso7816_slave_c_apdu_read(struct iso7816_slave *s) {
 
 /* Connect to C/R APDU */
 int iso7816_slave_r_apdu(struct iso7816_slave *s, const uint8_t *buf, int size) {
-    TRACE_WARN("r_apdu %d\n\r", size);
+    TRACE_WARNING("r_apdu %d\n\r", size);
     if (s->state != S_TPDU_WAIT_REPLY) return -EAGAIN; // not waiting for data
     if (size != s->r_apdu_size) {
-        TRACE_WARN("R-APDU data size incorrect size:%d != r_apdu_size:%d\n",
+        TRACE_WARNING("R-APDU data size incorrect size:%d != r_apdu_size:%d\n",
                     size, s->r_apdu_size);
         return -EIO; // FIXME: what should this be?
     }
@@ -274,7 +274,7 @@ void iso7816_slave_tick(struct iso7816_slave *s) {
     /* Monitor RST and VCC */
     if (!(rst && vcc)) {
         if (s->state != S_RESET) {
-            TRACE_WARN("%d -> S_RESET VCC:%d RST:%d\n\r", s->state, vcc, rst);
+            TRACE_WARNING("%d -> S_RESET VCC:%d RST:%d\n\r", s->state, vcc, rst);
             s->state = S_RESET;
         }
     }
@@ -293,11 +293,11 @@ void iso7816_slave_tick(struct iso7816_slave *s) {
         if (rst && vcc) {
             if (s->skip_reset) {
                 s->skip_reset--;
-                TRACE_WARN("Skipping reset (%d more)\n\r", s->skip_reset);
+                TRACE_WARNING("Skipping reset (%d more)\n\r", s->skip_reset);
                 s->state = S_INIT;
             }
             else {
-                TRACE_WARN("S_RESET -> S_ATR\n\r");
+                TRACE_WARNING("S_RESET -> S_ATR\n\r");
                 s->port = iso7816_port_init(1);
                 static const uint8_t atr[] =
                     {0x3B, 0x98, 0x96, 0x00, 0x93, 0x94,
@@ -315,27 +315,34 @@ void iso7816_slave_tick(struct iso7816_slave *s) {
            PTS1-3 : optional
            PCK  checksum
         */
-        TRACE_WARN("S_ATR\n\r");
-        next_receive(s, S_PTS_HEAD, NULL, 2);  // receive PTSS, PTS0
+        TRACE_WARNING("S_ATR\n\r");
+        next_receive(s, S_PTS_HEAD, s->msg.buf, 2);  // receive PTSS, PTS0
         break;
     case S_PTS_HEAD: {
+        uint8_t ptss = s->msg.pts.ptss;
         uint8_t pts0 = s->msg.pts.pts[0];
+        TRACE_WARNING("S_PTS_HEAD %02x %02x\n\r", ptss, pts0);
         uint8_t *p = &s->msg.pts.pts[1];
+        uint8_t *p_start = p;
         if (pts0 & (1<<4)) { s->pts1 =     p++; } else { s->pts1 = NULL; }
         if (pts0 & (1<<5)) { /*s->pts2 =*/ p++; }
         if (pts0 & (1<<6)) { /*s->pts3 =*/ p++; }
         s->pck = p; p++;
         // receive optionally PTS1-3 and PCK.
-        next_receive(s, S_PTS_TAIL, &s->msg.pts.pts[1], p - (&s->msg.pts.pts[1]));
+        next_receive(s, S_PTS_TAIL, p_start, p - p_start);
         break;
     }
-    case S_PTS_TAIL:
+    case S_PTS_TAIL: {
         /* PTS is in, send PTS ack */
-        next_send(s, S_PTS_ACK, NULL, 1 + s->pck - s->msg.buf);
+        int i, n = 1 + s->pck - s->msg.buf;
+        TRACE_WARNING("S_PTS_TAIL\n\r");
+        for (i=0; i<n; i++) TRACE_WARNING("%02X\n\r", s->msg.buf[i]);
+        next_send(s, S_PTS_ACK, s->msg.buf, n);
         break;
+    }
     case S_PTS_ACK:
         /* PTS ack is out.  Switch rate and start waiting for TPDU header */
-        TRACE_WARN("S_PTS_ACK\n\r");
+        TRACE_WARNING("S_PTS_ACK\n\r");
         if (s->pts1) {
             uint8_t fi = (*s->pts1) >> 4;
             uint8_t di = (*s->pts1) & 0x0F;
@@ -343,7 +350,7 @@ void iso7816_slave_tick(struct iso7816_slave *s) {
             iso7816_port_set_fidi(s->port, fidi);
         }
         else {
-            TRACE_WARN("No FIDI set.\n\r");
+            TRACE_WARNING("No FIDI set.\n\r");
         }
         next_receive_tpdu_header(s);
         break;
@@ -353,13 +360,18 @@ void iso7816_slave_tick(struct iso7816_slave *s) {
 
     case S_TPDU:
         /* TPDU header is in, send protocol byte. */
-        TRACE_WARN("S_TPDU\n\r");
+        TRACE_WARNING("S_TPDU %02X %02X %02X %02X %02X\n\r",
+                      s->msg.tpdu.cla,
+                      s->msg.tpdu.ins,
+                      s->msg.tpdu.p1,
+                      s->msg.tpdu.p2,
+                      s->msg.tpdu.p3);
         next_send(s, S_TPDU_PROT, &s->msg.tpdu.ins, 1);
         break;
     case S_TPDU_PROT:
         /* Protocol byte is out.
            P3 contains data size, INS determines direction. */
-        TRACE_WARN("S_TPDU_PROT\n\r");
+        //TRACE_WARNING("S_TPDU_PROT\n\r");
         switch(s->msg.tpdu.ins) {
         case INS_GET_RESPONSE:
         case INS_READ_BINARY:
@@ -381,7 +393,7 @@ void iso7816_slave_tick(struct iso7816_slave *s) {
 
     case S_TPDU_DATA:
         /* All C-APDU data is in.  Pass it to handler. */
-        TRACE_WARN("S_TPDU_DATA\n\r");
+        TRACE_WARNING("S_TPDU_DATA\n\r");
         s->state = S_TPDU_WAIT_REPLY;
         s->io_ptr = s->msg.buf;
         s->c_apdu_cb(s->c_apdu_ctx, s->c_apdu_size);
@@ -391,14 +403,14 @@ void iso7816_slave_tick(struct iso7816_slave *s) {
         break;
     case S_TPDU_REPLY:
         /* Send response data + SW */
-        TRACE_WARN("S_TPDU_REPLY\n\r");
+        TRACE_WARNING("S_TPDU_REPLY\n\r");
         next_send(s, S_TPDU_RESP,
                   s->msg.buf + s->c_apdu_size,
                   s->r_apdu_size);
         break;
     case S_TPDU_RESP:
         /* Response sent, wait for next TPDU */
-        TRACE_WARN("S_TPDU_RESP\n\r");
+        TRACE_WARNING("S_TPDU_RESP\n\r");
         next_receive_tpdu_header(s);
         break;
 
@@ -410,7 +422,7 @@ void iso7816_slave_tick(struct iso7816_slave *s) {
     case S_TX: next_io(s, iso7816_port_tx(s->port, s->io_ptr[0])); break;
 
     default:
-        TRACE_WARN("unknown state %d\n\r", s->state);
+        TRACE_WARNING("unknown state %d\n\r", s->state);
         s->state = S_INIT;
         break;
     }
@@ -428,7 +440,8 @@ struct iso7816_slave *iso7816_slave_init(iso7816_slave_c_apdu_t c_apdu_cb, void 
     s->c_apdu_ctx = c_apdu_ctx;
     s->port = iso7816_port_init(1);
     s->state = S_INIT;
-    s->skip_reset = 1;
+    s->skip_reset = 0;
+    // s->skip_reset = 1;  // BLU phone workaround: skip initial 1.8V startup
     return s;
 }
 
