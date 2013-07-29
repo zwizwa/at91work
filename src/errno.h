@@ -8,6 +8,7 @@
 #define ENOERR  0
 #define EIO     5
 #define EAGAIN 11
+#define	EINVAL 22
 
 #endif
 

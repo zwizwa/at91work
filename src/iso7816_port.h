@@ -12,5 +12,7 @@ int iso7816_port_rx(struct iso7816_port *p, uint8_t *c);
 
 void iso7816_port_get_rst_vcc(struct iso7816_port *p, int *rst, int *vcc);
 
+void iso7816_port_set_fidi(struct iso7816_port *p, uint32_t fidi);
+
 
 #endif

@@ -331,9 +331,9 @@ static void UsbDataReceived(unsigned int unused,
 static char hexout_buf[DATABUFFERSIZE];
 
 /* Transfer next chunk of HEX data until done. */
-static void UsbDataSent(unsigned int unused,
+static void UsbDataSent(void *pArg,
                         unsigned char status,
-                        unsigned int sent,
+                        unsigned int transferred,
                         unsigned int remaining)
 {
     // FIXME: handle errors.  Function args are ignored.

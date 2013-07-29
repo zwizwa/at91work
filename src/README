@@ -1,0 +1,14 @@
+errno.h
+hexin.h            # simple hex->bin converter for ASCII protocol
+iso7816_port.h     # generaic uart abstraction
+iso7816_at91.c     # AT91 uart code (implements iso7816_port.h)
+iso7816_slave.h|c  # slave (card) side protocol
+iso7816_master.c   # master (reader) side protocol
+mim.py
+README
+
+Basic ideas:
+- Keep slave side simple so it can be shared with card OS
+- Implement as non-blocking state machine to avoid dependency on RTOS
+- current ad-hoc sniffer can be replaced by combining true slave and master sides
+

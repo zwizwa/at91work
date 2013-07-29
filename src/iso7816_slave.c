@@ -76,6 +76,13 @@ struct tpdu {
     uint8_t data[];
 } __attribute__((__packed__));
 
+// FIXME: share with master
+struct pts {
+    uint8_t ptss;
+    uint8_t pts[5]; // PTS0, optional PTS1-PTS3, PCK
+} __attribute__((__packed__));
+
+
 
 /* BYTE-LEVEL SLAVE-SIDE PROTOCOL */
 
@@ -84,7 +91,8 @@ enum iso7816_state {
     S_RESET,    // wait for RST high and start sending ATR
     S_ATR,      // ATR is out, start waiting for PTS (FIXME: hardcoded to 3 bytes)
 
-    S_PTS,      // PTS is in, start sending PTS ack
+    S_PTS_HEAD, // first 2 PTS bytes are in
+    S_PTS_TAIL, // full PTS is in
     S_PTS_ACK,  // PTS ack is out, start listening for TPDU header.
 
     S_TPDU,
@@ -110,13 +118,59 @@ struct iso7816_slave {
     uint8_t *io_ptr;            // current read(RX) or write(TX) index
     uint8_t *io_endx;           // current(TX) or expected(RX) size of message
     union {
+        struct pts pts;
         struct tpdu tpdu;
         uint8_t buf[8 + 256];   // receive/send buffer
     } msg;
     uint8_t c_apdu_size;  // c_apdu = tpdu header + c_apdu_size bytes
     uint8_t r_apdu_size;  // r_apdu = r_apdu_size bytes after c_apdu
     int skip_reset;
+    uint8_t *pts1, *pck;
 };
+
+
+/* Table 6 from ISO 7816-3 */
+static const uint16_t fi_table[] = {
+	372, 372, 558, 744, 1116, 1488, 1860, 0,
+	0, 512, 768, 1024, 1536, 2048, 0, 0
+};
+
+/* Table 7 from ISO 7816-3 */
+static const uint8_t di_table[] = {
+	0, 1, 2, 4, 8, 16, 32, 64,
+	12, 20, 2, 4, 8, 16, 32, 64,
+};
+
+#define ARRAY_SIZE(a) (sizeof(a) / sizeof(a[0]))
+
+/* compute the F/D ratio based on Fi and Di values */
+static int compute_fidi_ratio(uint8_t fi, uint8_t di)
+{
+	uint16_t f, d;
+	int ret;
+
+	if (fi >= ARRAY_SIZE(fi_table) ||
+	    di >= ARRAY_SIZE(di_table))
+		return -EINVAL;
+
+	f = fi_table[fi];
+	if (f == 0)
+		return -EINVAL;
+
+	d = di_table[di];
+	if (d == 0)
+		return -EINVAL;
+
+	/* See table 7 of ISO 7816-3: From 1000 on we divide by 1/d,
+	 * which equals a multiplication by d */
+	if (di < 8) 
+		ret = f / d;
+	else
+		ret = f * d;
+
+	return ret;
+}
+
 
 
 /* Start S_RX/S_TX transfer and continue at io_next */
@@ -254,19 +308,40 @@ void iso7816_slave_tick(struct iso7816_slave *s) {
         break;
     }
     case S_ATR:
-        /* ATR is out, wait for Protocol Type Selection (PTS) */
+        /* ATR is out, wait for Protocol Type Selection (PTS)
+           http://www.cardwerk.com/smartcards/smartcard_standard_ISO7816-3.aspx
+           PTSS FF
+           PTS0 b5=PTS1, b6=PTS2, b7=PTS3 preset
+           PTS1-3 : optional
+           PCK  checksum
+        */
         TRACE_WARN("S_ATR\n\r");
-        next_receive(s, S_PTS, NULL, 3);  // FIXME: hardcoded to 3 bytes from BTU phone
+        next_receive(s, S_PTS_HEAD, NULL, 2);  // receive PTSS, PTS0
         break;
-    case S_PTS:
+    case S_PTS_HEAD: {
+        uint8_t pts0 = s->msg.pts.pts[0];
+        uint8_t *p = &s->msg.pts.pts[1];
+        if (pts0 & (1<<4)) { s->pts1 =     p++; } else { s->pts1 = NULL; }
+        if (pts0 & (1<<5)) { /*s->pts2 =*/ p++; }
+        if (pts0 & (1<<6)) { /*s->pts3 =*/ p++; }
+        s->pck = p; p++;
+        // receive optionally PTS1-3 and PCK.
+        next_receive(s, S_PTS_TAIL, &s->msg.pts.pts[1], p - (&s->msg.pts.pts[1]));
+        break;
+    }
+    case S_PTS_TAIL:
         /* PTS is in, send PTS ack */
-        TRACE_WARN("S_PTS %02x %02x %02x\n\r",
-                    s->msg.buf[0], s->msg.buf[1], s->msg.buf[2]);
-        next_send(s, S_PTS_ACK, NULL, 3);
+        next_send(s, S_PTS_ACK, NULL, 1 + s->pck - s->msg.buf);
         break;
     case S_PTS_ACK:
-        /* PTS ack is out, Start waiting for TPDU header */
+        /* PTS ack is out.  Switch rate and start waiting for TPDU header */
         TRACE_WARN("S_PTS_ACK\n\r");
+        if (s->pts1) {
+            uint8_t fi = (*s->pts1) >> 4;
+            uint8_t di = (*s->pts1) & 0x0F;
+            int fidi = compute_fidi_ratio(fi, di);
+            iso7816_port_set_fidi(s->port, fidi);
+        }
         next_receive_tpdu_header(s);
         break;
 
