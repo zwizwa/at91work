@@ -282,7 +282,7 @@ void USBDCallbacks_Suspended(void)
 }
 
 
-static uint8_t hexin_buf[256];
+static uint8_t hexin_buf[512];
 static struct hexin h = {.buf = hexin_buf};
 static struct iso7816_slave *iso7816_slave;
 
@@ -297,12 +297,17 @@ static void UsbDataReceived(unsigned int unused,
 {
     // Check that data has been received successfully
     if (status == USBD_STATUS_SUCCESS) {
+
+        usbBuffer[received] = 0; // FIXME: hack!
+        TRACE_DEBUG("usb_in: %s\n\r", usbBuffer);
+
         int i;
         for (i=0; i<received; i++) {
             int rv = hexin_push(&h, usbBuffer[i]);
             if (rv > 0) {
                 iso7816_slave_r_apdu(iso7816_slave, hexin_buf, rv);
                 hexin_reset(&h);
+                bzero(hexin_buf, sizeof(hexin_buf));
             }
         }
 

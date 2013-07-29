@@ -33,7 +33,7 @@ static inline void hexin_print(struct hexin *r) {
 static inline int hexin_push(struct hexin *r, uint8_t c) {
     // FIXME: check overflow
     if ((c == '\r') || (c == '\n')) {
-        hexin_print(r);
+        // hexin_print(r);
         return hexin_length(r);
     }
     int d0 = hexin_digit(c);
