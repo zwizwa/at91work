@@ -444,7 +444,7 @@ struct iso7816_slave *iso7816_slave_init(iso7816_slave_c_apdu_t c_apdu_cb, void 
     s->c_apdu_ctx = c_apdu_ctx;
     s->port = iso7816_port_init(1);
     s->state = S_INIT;
-    s->skip_reset = 0;
+    s->skip_reset = 1;
     // s->skip_reset = 1;  // BLU phone workaround: skip initial 1.8V startup
     return s;
 }
