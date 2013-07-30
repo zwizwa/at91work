@@ -84,10 +84,17 @@ struct pts {
 
 
 
-/* BYTE-LEVEL SLAVE-SIDE PROTOCOL */
+/* BYTE-LEVEL SLAVE-SIDE PROTOCOL 
+
+S_OFF, vcc=1 -> S_ON
+S_ON,  vcc=0 -> S_OFF
+
+*/
 
 enum iso7816_state {
-    S_INIT = 0, // wait for RST low
+    S_HALT = 0, // wait for VCC low
+    S_OFF,      // wait for VCC high
+    S_ON,       // wait for RST low
     S_RESET,    // wait for RST high and start sending ATR
     S_ATR,      // ATR is out, start waiting for PTS (FIXME: hardcoded to 3 bytes)
 
@@ -124,7 +131,7 @@ struct iso7816_slave {
     } msg;
     int c_apdu_size;  // c_apdu = tpdu header + c_apdu_size bytes
     int r_apdu_size;  // r_apdu = r_apdu_size bytes after c_apdu
-    int skip_reset;
+    int skip_power;
     uint8_t *pts1, *pck;
 };
 
@@ -269,15 +276,8 @@ void iso7816_slave_tick(struct iso7816_slave *s) {
     int rst, vcc;
     iso7816_port_get_rst_vcc(s->port, &rst, &vcc);
 
-    // vcc = 1; // HACK: effectively ignore VCC, just look at RST
 
-    /* Monitor RST and VCC */
-    if (!(rst && vcc)) {
-        if (s->state != S_RESET) {
-            TRACE_WARNING("%d -> S_RESET VCC:%d RST:%d\n\r", s->state, vcc, rst);
-            s->state = S_RESET;
-        }
-    }
+    if (!vcc) s->state = S_OFF;
 
 
     switch(s->state) {
@@ -285,25 +285,37 @@ void iso7816_slave_tick(struct iso7816_slave *s) {
            These states are "high level" states executed in sequence. */
 
         /**** STARTUP ****/
-    case S_INIT:
-        /* Don't talk to iso7816 master in unknown state. */
+
+    case S_HALT:
+        /* Wait until next power cycle. */
         break;
+    case S_OFF:
+        if (vcc) {
+            TRACE_WARNING("->S_ON\n\r");
+            s->state = S_ON;
+        }
+        break;
+    case S_ON:
+        if (s->skip_power) {
+            TRACE_WARNING("->S_ON_SKIP %d\n\r", s->skip_power);
+            s->state = S_HALT;
+            s->skip_power--;
+        }
+        else if (!rst) {
+            TRACE_WARNING("->S_RESET\n\r");
+            s->state = S_RESET;
+        }
+        break;
+
     case S_RESET: {
         /* Boot sync: wait for RST release. */
-        if (rst && vcc) {
-            if (s->skip_reset) {
-                s->skip_reset--;
-                TRACE_WARNING("Skipping reset (%d more)\n\r", s->skip_reset);
-                s->state = S_INIT;
-            }
-            else {
-                TRACE_WARNING("S_RESET -> S_ATR\n\r");
-                s->port = iso7816_port_init(1);
-                static const uint8_t atr[] =
-                    {0x3B, 0x98, 0x96, 0x00, 0x93, 0x94,
-                     0x03, 0x08, 0x05, 0x03, 0x03, 0x03};
-                next_send(s, S_ATR, atr, sizeof(atr));
-            }
+        if (rst) {
+            TRACE_WARNING("->S_ATR\n\r");
+            s->port = iso7816_port_init(1);
+            static const uint8_t atr[] =
+                {0x3B, 0x98, 0x96, 0x00, 0x93, 0x94,
+                 0x03, 0x08, 0x05, 0x03, 0x03, 0x03};
+            next_send(s, S_ATR, atr, sizeof(atr));
         }
         break;
     }
@@ -427,7 +439,7 @@ void iso7816_slave_tick(struct iso7816_slave *s) {
 
     default:
         TRACE_WARNING("unknown state %d\n\r", s->state);
-        s->state = S_INIT;
+        s->state = S_HALT;
         break;
     }
 }
@@ -443,8 +455,8 @@ struct iso7816_slave *iso7816_slave_init(iso7816_slave_c_apdu_t c_apdu_cb, void 
     s->c_apdu_cb  = c_apdu_cb;
     s->c_apdu_ctx = c_apdu_ctx;
     s->port = iso7816_port_init(1);
-    s->state = S_INIT;
-    s->skip_reset = 1;
+    s->state = S_HALT;
+    s->skip_power = 2;
     // s->skip_reset = 1;  // BLU phone workaround: skip initial 1.8V startup
     return s;
 }
