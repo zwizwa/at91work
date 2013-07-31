@@ -28,118 +28,7 @@
  */
 
 //-----------------------------------------------------------------------------
-/// \dir "USB CDC serial converter"
-///
-/// !!!Purpose
-///
-/// The USB CDC Serial Project will help you to get familiar with the
-/// USB Device Port(UDP) and USART interface on AT91SAM microcontrollers. Also
-/// it can help you to be familiar with the USB Framework that is used for
-/// rapid development of USB-compliant class drivers such as USB Communication
-/// Device class (CDC).
-///
-/// You can find following information depends on your needs:
-/// - Sample usage of USB CDC driver and USART driver.
-/// - USB CDC driver development based on the AT91 USB Framework.
-/// - USB enumerate sequence, the standard and class-specific descriptors and
-///   requests handling.
-/// - The initialize sequence and usage of UDP interface.
-/// - The initialize sequence and usage of USART interface with PDC.
-///
-/// !See
-/// - usart: USART interface driver
-/// - tc: TIMER/COUNTER interface driver
-/// - usb: USB Framework, USB CDC driver and UDP interface driver
-///    - "AT91 USB device framework"
-///       - "USBD API"
-///    - "cdc-serial"
-///       - "USB CDC Serial Device"
-///       - "USB CDC Serial Host Driver"
-///
-/// !!!Requirements
-///
-/// This package can be used with all Atmel evaluation kits that have both
-/// UDP and USART interface.
-///
-/// The current supported board list:
-/// - at91sam7s-ek (exclude at91sam7s32)
-/// - at91sam7x-ek
-/// - at91sam7xc-ek
-/// - at91sam7a3-ek
-/// - at91sam7se-ek
-/// - at91sam9260-ek
-/// - at91sam9263-ek
-///
-/// !!!Description
-///
-/// When an EK running this program connected to a host (PC for example), with
-/// USB cable, the EK appears as a Seriao COM port for the host, after driver
-/// installation with the offered 6119.inf. Then the host can send or receive
-/// data through the port with host software. The data stream from the host is
-/// then sent to the EK, and forward to USART port of AT91SAM chips. The USART
-/// port of the EK is monitored by the timer and the incoming data will be sent
-/// to the host.
-///
-/// !!!Usage
-///
-/// -# Build the program and download it inside the evaluation board. Please
-///    refer to the
-///    <a href="http://www.atmel.com/dyn/resources/prod_documents/doc6224.pdf">
-///    SAM-BA User Guide</a>, the
-///    <a href="http://www.atmel.com/dyn/resources/prod_documents/doc6310.pdf">
-///    GNU-Based Software Development</a> application note or to the
-///    <a href="ftp://ftp.iar.se/WWWfiles/arm/Guides/EWARM_UserGuide.ENU.pdf">
-///    IAR EWARM User Guide</a>, depending on your chosen solution.
-/// -# On the computer, open and configure a terminal application
-///    (e.g. HyperTerminal on Microsoft Windows) with these settings:
-///   - 115200 bauds
-///   - 8 bits of data
-///   - No parity
-///   - 1 stop bit
-///   - No flow control
-/// -# Start the application.
-/// -# In the terminal window, the following text should appear:
-///     \code
-///     -- USB Device CDC Serial Project xxx --
-///     -- AT91xxxxxx-xx
-///     -- Compiled: xxx xx xxxx xx:xx:xx --
-///     \endcode
-/// -# When connecting USB cable to windows, the LED blinks, and the host
-///    reports a new USB %device attachment (if it's the first time you connect
-///    an %audio speaker demo board to your host). You can use the inf file
-///    at91lib\\usb\\device\\cdc-serial\\drv\\6119.inf to install the serial
-///    port. Then new "AT91 USB to Serial Converter (COMx)" appears in the
-///    hardware %device list.
-/// -# You can run hyperterminal to send data to the port. And it can be seen
-///    at the other hyperterminal connected to the USART port of the EK.
-///
-//-----------------------------------------------------------------------------
-
-//-----------------------------------------------------------------------------
-/// \unit
-///
-/// !Purpose
-///
-/// This file contains all the specific code for the
-/// usb-device-cdc-serial-project
-///
-/// !Contents
-///
-/// The code can be roughly broken down as follows:
-///    - Configuration functions
-///       - VBus_Configure
-///       - PIO & Timer configurations in start of main
-///    - Interrupt handlers
-///       - ISR_Vbus
-///       - ISR_Timer0
-///       - ISR_Usart0
-///    - Callback functions
-///       - UsbDataReceived
-///    - The main function, which implements the program behavior
-///
-/// Please refer to the list of functions in the #Overview# tab of this unit
-/// for more detailed information.
-//-----------------------------------------------------------------------------
+/// derived from "USB CDC serial converter"
 
 //-----------------------------------------------------------------------------
 //         Headers
@@ -282,9 +171,18 @@ void USBDCallbacks_Suspended(void)
 }
 
 
+/* Use newline-terminated ASCII hex on CDC I/O.  This ad-hoc protocol
+   was easiest to implement considering a single use case: a python
+   program tying into pyscard.
+
+   Replacing the packet transport with something else is trivial: see
+   is7816*_apdu_* calls. */
+
 static uint8_t hexin_buf[512];
 static struct hexin h = {.buf = hexin_buf};
 static struct iso7816_slave *iso7816_slave;
+
+static char hexout_buf[DATABUFFERSIZE];
 
 
 //------------------------------------------------------------------------------
@@ -305,7 +203,7 @@ static void UsbDataReceived(unsigned int unused,
         for (i=0; i<received; i++) {
             int rv = hexin_push(&h, usbBuffer[i]);
             if (rv > 0) {
-                iso7816_slave_r_apdu(iso7816_slave, hexin_buf, rv);
+                iso7816_slave_r_apdu_write(iso7816_slave, hexin_buf, rv);
                 hexin_reset(&h);
                 bzero(hexin_buf, sizeof(hexin_buf));
             }
@@ -332,8 +230,6 @@ static void UsbDataReceived(unsigned int unused,
 }
 
 
-/* Poor man's delegation: print in HEX on the terminal. */
-static char hexout_buf[DATABUFFERSIZE];
 
 /* Transfer next chunk of HEX data until done. */
 static void UsbDataSent(void *pArg,
@@ -353,7 +249,6 @@ static void UsbDataSent(void *pArg,
     TransferCallback callback;
     if (rv < 0) {
         // Don't print \r -> python readline() don't like
-        // Got to love that legacy CR/LF stuff..
         sprintf(hexout_buf + char_index, "\n");
         callback = NULL;
     }

@@ -131,9 +131,22 @@ struct iso7816_slave {
     } msg;
     int c_apdu_size;  // c_apdu = tpdu header + c_apdu_size bytes
     int r_apdu_size;  // r_apdu = r_apdu_size bytes after c_apdu
-    int skip_power;
+    int skip_power; // see below
     uint8_t *pts1, *pck;
 };
+
+/* Power cycle skipping: To make sure the phone selects the correct
+   operating voltage, it might be necessary to skip a number of power
+   cycles before sending out an ATR.
+
+   EX: For Nexus One, skip_power=2 seems to work.
+
+   Pulse 1 = SIMtrace VCC pullup (phone doesn't assert)
+   Pulse 2 = Phone asserts 2 V
+   Pulse 3 = Phone asserts 3 V
+
+*/
+
 
 
 /* Table 6 from ISO 7816-3 */
@@ -234,9 +247,9 @@ static void next_receive_tpdu_header(struct iso7816_slave *s) {
 
 
 int iso7816_slave_c_apdu_read(struct iso7816_slave *s) {
-    /* During the request delegation phase, we only provide C-APDU
-     * bytes.  Delegate will call iso7816_slave_r_apdu() to continue
-     * processing. */
+    /* During the request delegation phase, we provide C-APDU, one
+       byte at a time.  Delegate will call iso7816_slave_r_apdu() to
+       continue processing. */
     if (s->state != S_TPDU_WAIT_REPLY) {
         TRACE_ERROR("iso7816_slave_c_apdu_read state %d\n", s->state);
         return -EIO;
@@ -250,10 +263,7 @@ int iso7816_slave_c_apdu_read(struct iso7816_slave *s) {
 }
 
 
-
-
-/* Connect to C/R APDU */
-int iso7816_slave_r_apdu(struct iso7816_slave *s, const uint8_t *buf, int size) {
+int iso7816_slave_r_apdu_write(struct iso7816_slave *s, const uint8_t *buf, int size) {
     TRACE_WARNING("r_apdu %d\n\r", size);
     if (s->state != S_TPDU_WAIT_REPLY) return -EAGAIN; // not waiting for data
     if (size != s->r_apdu_size) {
@@ -306,7 +316,6 @@ void iso7816_slave_tick(struct iso7816_slave *s) {
             s->state = S_RESET;
         }
         break;
-
     case S_RESET: {
         /* Boot sync: wait for RST release. */
         if (rst) {
@@ -331,6 +340,7 @@ void iso7816_slave_tick(struct iso7816_slave *s) {
         next_receive(s, S_PTS_HEAD, s->msg.buf, 2);  // receive PTSS, PTS0
         break;
     case S_PTS_HEAD: {
+        // TRACE_DEBUG("S_PTS_HEAD"); // debug print interferes with reception
         uint8_t ptss = s->msg.pts.ptss;
         uint8_t pts0 = s->msg.pts.pts[0];
         TRACE_DEBUG("S_PTS_HEAD %02x %02x\n\r", ptss, pts0);
@@ -381,19 +391,17 @@ void iso7816_slave_tick(struct iso7816_slave *s) {
         next_send(s, S_TPDU_PROT, &s->msg.tpdu.ins, 1);
         break;
     case S_TPDU_PROT: {
-        int p3_len = s->msg.tpdu.p3;
-        if (p3_len == 0) p3_len = 0x100;
-
         /* Protocol byte is out.
            P3 contains data size, INS determines direction. */
         //TRACE_DEBUG("S_TPDU_PROT\n\r");
+        int p3_len = (s->msg.tpdu.p3 != 0) ? s->msg.tpdu.p3 : 0x100;
         switch(s->msg.tpdu.ins) {
         case INS_GET_RESPONSE:
         case INS_READ_BINARY:
         case INS_READ_RECORD:
         case INS_STATUS:
             /* data in R-APDU */
-            /* FIXME: there are probably more..  Go over specs */
+            /* FIXME: there are probably morec cases.  Go over specs */
             s->c_apdu_size = sizeof(struct tpdu);
             s->r_apdu_size = p3_len + 2;
             break;

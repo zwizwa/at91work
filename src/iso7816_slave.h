@@ -22,7 +22,7 @@ int iso7816_slave_c_apdu_read(struct iso7816_slave *s);
 
 
 // Send R-APDU to serial port.
-int iso7816_slave_r_apdu(struct iso7816_slave *s, const uint8_t *buf, int size);
+int iso7816_slave_r_apdu_write(struct iso7816_slave *s, const uint8_t *buf, int size);
 
 struct iso7816_slave *iso7816_slave_init(iso7816_slave_c_apdu_t c_apdu_cb, void *c_apdu_ctx);
 
