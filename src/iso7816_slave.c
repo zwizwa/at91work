@@ -84,24 +84,20 @@ struct pts {
 
 
 
-/* BYTE-LEVEL SLAVE-SIDE PROTOCOL 
-
-S_OFF, vcc=1 -> S_ON
-S_ON,  vcc=0 -> S_OFF
-
-*/
+/* BYTE-LEVEL SLAVE-SIDE PROTOCOL */
 
 enum iso7816_state {
+    /* STARTUP */
     S_HALT = 0, // wait for VCC low
     S_OFF,      // wait for VCC high
     S_ON,       // wait for RST low
-    S_RESET,    // wait for RST high and start sending ATR
-    S_ATR,      // ATR is out, start waiting for PTS (FIXME: hardcoded to 3 bytes)
-
-    S_PTS_HEAD, // first 2 PTS bytes are in
-    S_PTS_TAIL, // full PTS is in
+    S_RESET,    // wait for RST high, then sending ATR
+    S_ATR,      // ATR is out, start waiting for PTS
+    S_PTS_HEAD, // first 2 PTS bytes are in, determine PTS length and receive.
+    S_PTS_TAIL, // full PTS is in, send PTS ack
     S_PTS_ACK,  // PTS ack is out, start listening for TPDU header.
 
+    /* MAIN LOOP */
     S_TPDU,
     S_TPDU_PROT,
     S_TPDU_DATA,
@@ -109,7 +105,7 @@ enum iso7816_state {
     S_TPDU_REPLY,
     S_TPDU_RESP,
 
-    /* RX/TX: io_next contains next state after I/O is done */
+    /* LOW-LEVEL RX/TX: io_next contains next state after I/O is done */
     S_RX,
     S_TX,
 
@@ -127,7 +123,7 @@ struct iso7816_slave {
     union {
         struct pts pts;
         struct tpdu tpdu;
-        uint8_t buf[256 + 8]; // receive/send buffer (round up 5 + 256 + 2)
+        uint8_t buf[256 + 8]; // receive/send buffer (round up from 5 + 256 + 2)
     } msg;
     int c_apdu_size;  // c_apdu = tpdu header + c_apdu_size bytes
     int r_apdu_size;  // r_apdu = r_apdu_size bytes after c_apdu
@@ -141,7 +137,7 @@ struct iso7816_slave {
 
    EX: For Nexus One, skip_power=2 seems to work.
 
-   Pulse 1 = SIMtrace VCC pullup (phone doesn't assert)
+   Pulse 1 = SIMtrace VCC pullup (phone doesn't assert VCC line)
    Pulse 2 = Phone asserts 2 V
    Pulse 3 = Phone asserts 3 V
 
@@ -239,7 +235,7 @@ static void next_io(struct iso7816_slave *s, int rv) {
     }
 }
 
-static void next_receive_tpdu_header(struct iso7816_slave *s) {
+static void next_receive_S_TPDU(struct iso7816_slave *s) {
     memset(s->msg.buf, 0x55, sizeof(s->msg.buf));  // init simplifies debugging
     next_receive(s, S_TPDU, s->msg.buf, sizeof(s->msg.tpdu));
 }
@@ -291,8 +287,8 @@ void iso7816_slave_tick(struct iso7816_slave *s) {
 
 
     switch(s->state) {
-        /* PROTOCOL:
-           These states are "high level" states executed in sequence. */
+        /* These states are "high level" states executed mostly in
+           sequence, interleaved with message RX/TX states. */
 
         /**** STARTUP ****/
 
@@ -340,6 +336,7 @@ void iso7816_slave_tick(struct iso7816_slave *s) {
         next_receive(s, S_PTS_HEAD, s->msg.buf, 2);  // receive PTSS, PTS0
         break;
     case S_PTS_HEAD: {
+        /* Determine length of remainder of PTS and receive. */
         // TRACE_DEBUG("S_PTS_HEAD"); // debug print interferes with reception
         uint8_t ptss = s->msg.pts.ptss;
         uint8_t pts0 = s->msg.pts.pts[0];
@@ -374,7 +371,7 @@ void iso7816_slave_tick(struct iso7816_slave *s) {
         else {
             TRACE_DEBUG("No FIDI set.\n\r");
         }
-        next_receive_tpdu_header(s);
+        next_receive_S_TPDU(s);
         break;
 
 
@@ -435,7 +432,7 @@ void iso7816_slave_tick(struct iso7816_slave *s) {
     case S_TPDU_RESP:
         /* Response sent, wait for next TPDU */
         TRACE_DEBUG("S_TPDU_RESP\n\r");
-        next_receive_tpdu_header(s);
+        next_receive_S_TPDU(s);
         break;
 
 
