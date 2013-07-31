@@ -55,7 +55,7 @@ OPTIMIZATION = -O0 -Wno-format -Werror -Wno-unused-variable
 AT91LIB = ../at91lib
 
 # Output file basename
-OUTPUT = cdc-test-project-$(BOARD)-$(CHIP)
+OUTPUT = iso7816-slave-cdc-project-$(BOARD)-$(CHIP)
 
 # Compile for all memories available on the board (this sets $(MEMORIES))
 include $(AT91LIB)/boards/$(BOARD)/board.mak
