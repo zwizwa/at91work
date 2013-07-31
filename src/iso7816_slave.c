@@ -1,7 +1,22 @@
-/* License: GPL
-   (c) 2010 by Harald Welte <hwelte@hmw-consulting.de>
-   (c) 2013 by Tom Schouten <tom@zwizwa.be>
-*/
+/* ISO7816-3 TPDU T=0 slave side protocol.
+ * (C) 2010 by Harald Welte <hwelte@hmw-consulting.de>
+ * (C) 2013 by Tom Schouten <tom@getbeep.com>
+ *
+ *  This program is free software; you can redistribute it and/or modify
+ *  it under the terms of the GNU General Public License as published by
+ *  the Free Software Foundation; either version 2 of the License, or
+ *  (at your option) any later version.
+ *
+ *  This program is distributed in the hope that it will be useful,
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *  GNU General Public License for more details.
+ *
+ *  You should have received a copy of the GNU General Public License
+ *  along with this program; if not, write to the Free Software
+ *  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ *
+ */
 
 /* Basic design notes.
 
@@ -127,21 +142,10 @@ struct iso7816_slave {
     } msg;
     int c_apdu_size;  // c_apdu = tpdu header + c_apdu_size bytes
     int r_apdu_size;  // r_apdu = r_apdu_size bytes after c_apdu
-    int skip_power; // see below
+    int skip_power;
     uint8_t *pts1, *pck;
 };
 
-/* Power cycle skipping: To make sure the phone selects the correct
-   operating voltage, it might be necessary to skip a number of power
-   cycles before sending out an ATR.
-
-   EX: For Nexus One, skip_power=2 seems to work.
-
-   Pulse 1 = SIMtrace VCC pullup (phone doesn't assert VCC line)
-   Pulse 2 = Phone asserts 2 V
-   Pulse 3 = Phone asserts 3 V
-
-*/
 
 
 
@@ -461,8 +465,19 @@ struct iso7816_slave *iso7816_slave_init(iso7816_slave_c_apdu_t c_apdu_cb, void 
     s->c_apdu_ctx = c_apdu_ctx;
     s->port = iso7816_port_init(1);
     s->state = S_HALT;
+
+
+    /* Power cycle skipping: To make sure the phone selects the correct
+       operating voltage, it might be necessary to skip a number of power
+       cycles before sending out an ATR.
+
+       EX: For Nexus One, skip_power=2 seems to work.
+
+       Pulse 1 = SIMtrace VCC pullup (phone doesn't assert VCC line)
+       Pulse 2 = Phone asserts 2 V
+       Pulse 3 = Phone asserts 3 V
+    */
     s->skip_power = 2;
-    // s->skip_reset = 1;  // BLU phone workaround: skip initial 1.8V startup
     return s;
 }
 
