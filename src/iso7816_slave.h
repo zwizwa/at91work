@@ -18,7 +18,7 @@ struct iso7816_slave;
 // Callback to initiate C-APDU packet transfer.
 typedef void (*iso7816_slave_c_apdu_t)(void *ctx, int size);
 // Obtain next C-APDU byte.  rv >= 0 is byte, other is EOF.
-int iso7816_slave_c_apdu_read(struct iso7816_slave *s);
+int iso7816_slave_c_apdu_getc(struct iso7816_slave *s);
 
 
 // Send R-APDU to serial port.
@@ -30,7 +30,20 @@ struct iso7816_slave *iso7816_slave_init(iso7816_slave_c_apdu_t c_apdu_cb, void 
 // application's event loop.
 void iso7816_slave_tick(struct iso7816_slave *s);
 
-
+// Send a-synchronous command to state machine.
+enum iso7816_slave_command_tag {
+    CMD_SET_ATR = 0,
+    CMD_SET_SKIP = 1,
+    CMD_HALT = 2,
+};
+struct iso7816_slave_command {
+    uint32_t command;
+    union {
+        uint32_t u32;
+        uint8_t buf[0];
+    } data;
+} __attribute__((__packed__));
+int iso7816_slave_command(struct iso7816_slave *s, const uint8_t *buf, int size);
 
 
 #endif

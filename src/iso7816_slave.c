@@ -14,7 +14,7 @@
  *
  *  You should have received a copy of the GNU General Public License
  *  along with this program; if not, write to the Free Software
- *  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ *  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  0-*- mode: 2111-1307  USA
  *
  */
 
@@ -126,6 +126,7 @@ enum iso7816_state {
 
 };
 
+#define MAX_ATR_BYTES 80 // ??
 
 struct iso7816_slave {
     struct iso7816_port *port;
@@ -144,6 +145,8 @@ struct iso7816_slave {
     int r_apdu_size;  // r_apdu = r_apdu_size bytes after c_apdu
     int skip_power;
     uint8_t *pts1, *pck;
+    uint8_t atr[MAX_ATR_BYTES];
+    int atr_size;
 };
 
 
@@ -246,7 +249,7 @@ static void next_receive_S_TPDU(struct iso7816_slave *s) {
 
 
 
-int iso7816_slave_c_apdu_read(struct iso7816_slave *s) {
+int iso7816_slave_c_apdu_getc(struct iso7816_slave *s) {
     /* During the request delegation phase, we provide C-APDU, one
        byte at a time.  Delegate will call iso7816_slave_r_apdu() to
        continue processing. */
@@ -262,17 +265,59 @@ int iso7816_slave_c_apdu_read(struct iso7816_slave *s) {
     }
 }
 
+static void iso7816_slave_print_apdu(struct iso7816_slave *s) {
+    int i;
+    const uint8_t *b = s->msg.buf;
+    printf("C-APDU:"); for (i=0; i<s->c_apdu_size; i++) printf("%02X", *b++); printf("\n\r");
+    printf("R-APDU:"); for (i=0; i<s->r_apdu_size; i++) printf("%02X", *b++); printf("\n\r");
+}
 
 int iso7816_slave_r_apdu_write(struct iso7816_slave *s, const uint8_t *buf, int size) {
     TRACE_WARNING("r_apdu %d\n\r", size);
     if (s->state != S_TPDU_WAIT_REPLY) return -EAGAIN; // not waiting for data
+
+    memcpy(s->msg.buf + s->c_apdu_size, buf, size);
     if (size != s->r_apdu_size) {
         TRACE_WARNING("R-APDU data size incorrect size:%d != r_apdu_size:%d\n",
                     size, s->r_apdu_size);
-        return -EIO; // FIXME: what should this be?
+        s->r_apdu_size = size;
+        iso7816_slave_print_apdu(s);
     }
-    memcpy(s->msg.buf + s->c_apdu_size, buf, size);
     s->state = S_TPDU_REPLY;
+    return ENOERR;
+}
+
+// Send a-synchronous command to state machine.
+int iso7816_slave_command(struct iso7816_slave *s, const uint8_t *buf, int size) {
+    struct iso7816_slave_command *c = (void*)buf;
+    int buf_size = size - offsetof(typeof(*c), data);
+    if (size < sizeof(*c)) {
+        TRACE_ERROR("Short command packet: %d bytes\n\r", size);
+        return -EIO;
+    }
+    switch(c->command) {
+    case CMD_SET_ATR:
+        TRACE_WARNING("CMD_SET_ATR\n\r");
+        if (buf_size > sizeof(s->atr)) {
+            TRACE_ERROR("ATR too large! %d > %d\n\r", buf_size, sizeof(s->atr));
+        }
+        else {
+            memcpy(s->atr, c->data.buf, buf_size);
+            s->atr_size = buf_size;
+        }
+        break;
+    case CMD_SET_SKIP:
+         TRACE_WARNING("CMD_SET_SKIP %d\n\r", c->data.u32);
+         s->skip_power = c->data.u32;
+         break;
+    case CMD_HALT:
+         TRACE_WARNING("CMD_HALT %d\n\r", c->data.u32);
+         s->state = S_HALT;
+         break;
+    default:
+        TRACE_ERROR("Unknown command %d, %d bytes\n\r", c->command, size);
+        break;
+    }
     return ENOERR;
 }
 
@@ -287,8 +332,10 @@ void iso7816_slave_tick(struct iso7816_slave *s) {
     iso7816_port_get_rst_vcc(s->port, &rst, &vcc);
 
 
-    if (!vcc) s->state = S_OFF;
-
+    if (!vcc && (s->state != S_OFF)) {
+        TRACE_WARNING("->S_OFF\n\r");
+        s->state = S_OFF;
+    }
 
     switch(s->state) {
         /* These states are "high level" states executed mostly in
@@ -321,10 +368,7 @@ void iso7816_slave_tick(struct iso7816_slave *s) {
         if (rst) {
             TRACE_WARNING("->S_ATR\n\r");
             s->port = iso7816_port_init(1);
-            static const uint8_t atr[] =
-                {0x3B, 0x98, 0x96, 0x00, 0x93, 0x94,
-                 0x03, 0x08, 0x05, 0x03, 0x03, 0x03};
-            next_send(s, S_ATR, atr, sizeof(atr));
+            next_send(s, S_ATR, s->atr, s->atr_size);
         }
         break;
     }
@@ -341,7 +385,7 @@ void iso7816_slave_tick(struct iso7816_slave *s) {
         break;
     case S_PTS_HEAD: {
         /* Determine length of remainder of PTS and receive. */
-        // TRACE_DEBUG("S_PTS_HEAD"); // debug print interferes with reception
+        // TRACE_DEBUG("S_PTS_HEAD"); // debug print introduces too much delay
         uint8_t ptss = s->msg.pts.ptss;
         uint8_t pts0 = s->msg.pts.pts[0];
         TRACE_DEBUG("S_PTS_HEAD %02x %02x\n\r", ptss, pts0);
@@ -393,22 +437,25 @@ void iso7816_slave_tick(struct iso7816_slave *s) {
         break;
     case S_TPDU_PROT: {
         /* Protocol byte is out.
-           P3 contains data size, INS determines direction. */
-        //TRACE_DEBUG("S_TPDU_PROT\n\r");
-        int p3_len = (s->msg.tpdu.p3 != 0) ? s->msg.tpdu.p3 : 0x100;
+           P3 contains data size, INS determines direction.
+           FIXME: there are probably more case.  Go over specs */
+        //TRACE_DEBUG("S_TPDU_PROT\n\r");  // debug introduces too much delay
+        // By default, P3==0x00 is 256 bytes payload...
+        int size = (s->msg.tpdu.p3 != 0) ? s->msg.tpdu.p3 : 0x100;
         switch(s->msg.tpdu.ins) {
+        case INS_STATUS:
+            // .. except here P3==0x00 is 0 bytes payload.
+            size = s->msg.tpdu.p3;
         case INS_GET_RESPONSE:
         case INS_READ_BINARY:
         case INS_READ_RECORD:
-        case INS_STATUS:
             /* data in R-APDU */
-            /* FIXME: there are probably morec cases.  Go over specs */
             s->c_apdu_size = sizeof(struct tpdu);
-            s->r_apdu_size = p3_len + 2;
+            s->r_apdu_size = size + 2;
             break;
         default:
             /* data in C-APDU */
-            s->c_apdu_size = sizeof(struct tpdu) + p3_len;
+            s->c_apdu_size = sizeof(struct tpdu) + size;
             s->r_apdu_size = 2;
         }
         next_receive(s, S_TPDU_DATA, &s->msg.tpdu.data[0],
@@ -461,10 +508,22 @@ static struct iso7816_slave phone;
 
 struct iso7816_slave *iso7816_slave_init(iso7816_slave_c_apdu_t c_apdu_cb, void *c_apdu_ctx) {
     struct iso7816_slave *s = &phone;
+    bzero(s, sizeof(*s));
     s->c_apdu_cb  = c_apdu_cb;
     s->c_apdu_ctx = c_apdu_ctx;
     s->port = iso7816_port_init(1);
     s->state = S_HALT;
+
+    static const uint8_t default_atr[] =
+    /* {0x3B, 0x98, 0x96, 0x00, 0x93, 0x94,
+       0x03, 0x08, 0x05, 0x03, 0x03, 0x03}; */
+        {0x3B, 0x9F, 0x95, 0x80, 0x1F, 0xC7, 0x80, 0x31,
+         0xE0, 0x73, 0xFE, 0x21, 0x13, 0x57, 0x4A, 0x33,
+         0x05, 0x30, 0x32, 0x34, 0x02, 0xA3};
+    /* {0x3b, 0x9e, 0x96, 0x80, 0x1f, 0xc7, 0x80, 0x31, 0xe0, 0x73,
+       0xfe, 0x21, 0x1b, 0x66, 0xd0, 0x01, 0x77, 0x60, 0x0e, 0x00, 0x18, }; */
+    s->atr_size = sizeof(default_atr);
+    memcpy(s->atr, default_atr, s->atr_size);
 
 
     /* Power cycle skipping: To make sure the phone selects the correct

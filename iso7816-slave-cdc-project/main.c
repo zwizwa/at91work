@@ -171,9 +171,11 @@ void USBDCallbacks_Suspended(void)
 }
 
 
-/* Use newline-terminated ASCII hex on CDC I/O.  This ad-hoc protocol
-   was easiest to implement considering a single use case: a python
-   program tying into pyscard.
+/* Use newline-terminated ASCII hex on CDC I/O to wrap a binary packet
+   interface in the simplest way possible.
+
+   This ad-hoc protocol was easiest to implement considering a single
+   use case: a python program tying into pyscard.
 
    Replacing the packet transport with something else is trivial: see
    is7816*_apdu_* calls. */
@@ -196,14 +198,32 @@ static void UsbDataReceived(unsigned int unused,
     // Check that data has been received successfully
     if (status == USBD_STATUS_SUCCESS) {
 
-        usbBuffer[received] = 0; // FIXME: hack!
-        TRACE_DEBUG("usb_in: %s\n\r", usbBuffer);
+        //usbBuffer[received] = 0; // FIXME: hack!
+        //TRACE_DEBUG("usb_in: %s\n\r", usbBuffer);
 
         int i;
         for (i=0; i<received; i++) {
             int rv = hexin_push(&h, usbBuffer[i]);
             if (rv > 0) {
-                iso7816_slave_r_apdu_write(iso7816_slave, hexin_buf, rv);
+                /* Binary packet received: route it. */
+                if (rv < 2) {
+                    TRACE_ERROR("Short packet, size %d\n\r", rv);
+                }
+                else {
+                    uint16_t sw = hexin_buf[rv-1] + (hexin_buf[rv-2]<<8);
+                    switch(sw) {
+                    case 0xFFFF:
+                        /* Unused R-APDU status word: we use this as protocol escape.
+                           FIXME: Might want to do this better */
+                        iso7816_slave_command(iso7816_slave, hexin_buf, rv-2);
+                        break;
+                    default:
+                        iso7816_slave_r_apdu_write(iso7816_slave, hexin_buf, rv);
+                        break;
+                    }
+                }
+
+                /* Prepare to receive next. */
                 hexin_reset(&h);
                 bzero(hexin_buf, sizeof(hexin_buf));
             }
@@ -242,7 +262,7 @@ static void UsbDataSent(void *pArg,
     int char_index = 0;
     int rv = 0;
     while((char_index < (DATABUFFERSIZE-1)) &&
-          ((rv = iso7816_slave_c_apdu_read(iso7816_slave)) >= 0)) {
+          ((rv = iso7816_slave_c_apdu_getc(iso7816_slave)) >= 0)) {
         sprintf(hexout_buf + char_index, "%02X", (uint8_t)rv);
         char_index += 2;
     }
@@ -293,7 +313,8 @@ int main()
 
     // Driver loop
     while (1) {
-        // Poll I/O state machine.
+        // Poll I/O state machine.  FIXME: disable interrupts as there
+        // is contention with USB callbacks.
         iso7816_slave_tick(iso7816_slave);
 
         // Device is not configured
