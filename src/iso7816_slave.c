@@ -273,7 +273,7 @@ static void iso7816_slave_print_apdu(struct iso7816_slave *s) {
 }
 
 int iso7816_slave_r_apdu_write(struct iso7816_slave *s, const uint8_t *buf, int size) {
-    TRACE_WARNING("r_apdu %d\n\r", size);
+    // TRACE_WARNING("r_apdu %d\n\r", size);
     if (s->state != S_TPDU_WAIT_REPLY) return -EAGAIN; // not waiting for data
 
     memcpy(s->msg.buf + s->c_apdu_size, buf, size);
@@ -311,7 +311,7 @@ int iso7816_slave_command(struct iso7816_slave *s, const uint8_t *buf, int size)
          s->skip_power = c->data.u32;
          break;
     case CMD_HALT:
-         TRACE_WARNING("CMD_HALT %d\n\r", c->data.u32);
+         TRACE_WARNING("CMD_HALT\n\r");
          s->state = S_HALT;
          break;
     default:
@@ -427,7 +427,7 @@ void iso7816_slave_tick(struct iso7816_slave *s) {
 
     case S_TPDU:
         /* TPDU header is in, send protocol byte. */
-        TRACE_DEBUG("S_TPDU %02X %02X %02X %02X %02X\n\r",
+        TRACE_WARNING("%02X%02X%02X%02X%02X\n\r",
                       s->msg.tpdu.cla,
                       s->msg.tpdu.ins,
                       s->msg.tpdu.p1,
@@ -438,17 +438,24 @@ void iso7816_slave_tick(struct iso7816_slave *s) {
     case S_TPDU_PROT: {
         /* Protocol byte is out.
            P3 contains data size, INS determines direction.
-           FIXME: there are probably more case.  Go over specs */
+
+           FIXME: INS->direction + size mapping is done by trial and
+                  error on real phone/SIM combos.  Go over specs for
+                  exhaustive list. */
+
         //TRACE_DEBUG("S_TPDU_PROT\n\r");  // debug introduces too much delay
+
         // By default, P3==0x00 is 256 bytes payload...
         int size = (s->msg.tpdu.p3 != 0) ? s->msg.tpdu.p3 : 0x100;
         switch(s->msg.tpdu.ins) {
         case INS_STATUS:
+        case INS_UNBLOCK_PIN:
             // .. except here P3==0x00 is 0 bytes payload.
             size = s->msg.tpdu.p3;
-        case INS_GET_RESPONSE:
         case INS_READ_BINARY:
         case INS_READ_RECORD:
+        case INS_GET_RESPONSE:
+        case INS_FETCH:
             /* data in R-APDU */
             s->c_apdu_size = sizeof(struct tpdu);
             s->r_apdu_size = size + 2;
@@ -458,6 +465,7 @@ void iso7816_slave_tick(struct iso7816_slave *s) {
             s->c_apdu_size = sizeof(struct tpdu) + size;
             s->r_apdu_size = 2;
         }
+        // FIXME: add timeout for all receive ops except the initial TPDU header.
         next_receive(s, S_TPDU_DATA, &s->msg.tpdu.data[0],
                      s->c_apdu_size - sizeof(struct tpdu));
         break;
