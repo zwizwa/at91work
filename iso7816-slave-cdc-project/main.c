@@ -292,20 +292,31 @@ static void c_apdu_cb(void *ctx, int size) {
 
 static uint32_t command = 0;
 
-void vr_callback(void *arg,
-                 unsigned char status,
-                 unsigned int received,
-                 unsigned int remaining) {
-    TRACE_WARNING("vr_callback %08x\n\r", command);
+void vr_read_callback(void *arg,
+                      unsigned char status,
+                      unsigned int received,
+                      unsigned int remaining) {
+    TRACE_WARNING("vr_read_callback %08x\n\r", command);
     command = 0;
 
-    USBD_Write(0,0,0,0,0); // send ack?
+    USBD_Write(0,0,0,0,0); // status
 }
+
+
+void vr_write_callback(void *arg,
+                       unsigned char status,
+                       unsigned int received,
+                       unsigned int remaining) {
+    TRACE_WARNING("vr_write_callback %08x\n\r", command);
+    command = 0;
+    USBD_Read(0,0,0,0,0); // status
+}
+
 
 void Vendor_RequestHandler(const USBGenericRequest *request) {
     TRACE_WARNING("Vendor_RequestHandler\n\r");
     switch (USBGenericRequest_GetDirection(request)) {
-    case USBGenericRequest_OUT:
+    case USBGenericRequest_OUT: // e.g 0x40
         TRACE_WARNING("USBGenericRequest_OUT %02X %d %d %d %d\n\r",
                       request->bmRequestType,
                       request->bRequest,
@@ -313,12 +324,14 @@ void Vendor_RequestHandler(const USBGenericRequest *request) {
                       request->wIndex,
                       request->wLength);
         /* Read payload. */
-        USBD_Read(0, &command, sizeof(command), vr_callback, 0);
+        USBD_Read(0, &command, sizeof(command), vr_read_callback, 0);
         break;
-    case USBGenericRequest_IN:  // e.g. 0xC1
+    case USBGenericRequest_IN:  // e.g. 0xC0
         TRACE_WARNING("USBGenericRequest_IN\n\r");
-        // This crashes hard:
-        // USBD_Write(0, dummy, sizeof(dummy), 0, 0);
+        // USBD_Write(0, &command, sizeof(command), 0, 0);
+        command = 0xAABBCCDD;
+        USBD_Write(0, &command, sizeof(command), vr_write_callback, 0);
+        // USBD_Read(0, &command, sizeof(command), vr_read_callback, 0);
         break;
     }
     // USBD_Stall(0);
@@ -355,6 +368,7 @@ int main()
 
     // Driver loop
     while (1) {
+
         // Poll I/O state machine.  FIXME: disable interrupts as there
         // is contention with USB callbacks.
         iso7816_slave_tick(iso7816_slave);

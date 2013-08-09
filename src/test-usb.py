@@ -28,7 +28,8 @@ def ctrl_IN():
                      request=123,
                      buffer=buf,
                      value=0,
-                     index=0)
+                     index=0,
+                     timeout=500)
     return rv, buf
 def ctrl_OUT():
     buf=[1,2,3,4]
@@ -36,7 +37,8 @@ def ctrl_OUT():
                      request=123,
                      buffer=buf,
                      value=0,
-                     index=0)
+                     index=0,
+                     timeout=500)
     return rv
     
 
