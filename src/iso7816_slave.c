@@ -28,6 +28,9 @@
      machine to avoid dependency on platform thread support, or
      busy-waiting single-threaded implementation.
 
+  TODO:
+   - use control transfers http://libusb.sourceforge.net/api-1.0/group__syncio.html
+
  */
 
 #include "iso7816_slave.h"

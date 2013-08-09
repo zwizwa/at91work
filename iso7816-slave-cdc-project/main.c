@@ -284,6 +284,30 @@ static void c_apdu_cb(void *ctx, int size) {
     UsbDataSent(0, 0, 0, 0);
 }
 
+/* SIMtrace PHONE interface uses VENDOR requests.
+   Patched in CDCDSerialDriver.c : USBDCallbacks_RequestReceived.
+   FIXME: once CCID driver is done, patch in the same way.
+   FIXME: should this use INTERFACE requests and define a second interface?
+*/
+
+static const uint8_t dummy[] = {1,2,3,4};
+
+void Vendor_RequestHandler(const USBGenericRequest *request) {
+    TRACE_WARNING("Vendor_RequestHandler\n\r");
+    switch(request->bmRequestType >> 7 & 1) {
+    case USBGenericRequest_OUT:
+        TRACE_WARNING("USBGenericRequest_OUT\n\r");
+        break;
+    case USBGenericRequest_IN:  // e.g. 0xC1
+        TRACE_WARNING("USBGenericRequest_IN\n\r");
+        USBD_Write(0, dummy, sizeof(dummy), 0, 0);
+        break;
+    }
+    // USBD_Stall(0);
+}
+
+
+
 //------------------------------------------------------------------------------
 //          Main
 //------------------------------------------------------------------------------
