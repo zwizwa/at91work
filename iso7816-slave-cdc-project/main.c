@@ -290,17 +290,35 @@ static void c_apdu_cb(void *ctx, int size) {
    FIXME: should this use INTERFACE requests and define a second interface?
 */
 
-static const uint8_t dummy[] = {1,2,3,4};
+static uint32_t command = 0;
+
+void vr_callback(void *arg,
+                 unsigned char status,
+                 unsigned int received,
+                 unsigned int remaining) {
+    TRACE_WARNING("vr_callback %08x\n\r", command);
+    command = 0;
+
+    USBD_Write(0,0,0,0,0); // send ack?
+}
 
 void Vendor_RequestHandler(const USBGenericRequest *request) {
     TRACE_WARNING("Vendor_RequestHandler\n\r");
-    switch(request->bmRequestType >> 7 & 1) {
+    switch (USBGenericRequest_GetDirection(request)) {
     case USBGenericRequest_OUT:
-        TRACE_WARNING("USBGenericRequest_OUT\n\r");
+        TRACE_WARNING("USBGenericRequest_OUT %02X %d %d %d %d\n\r",
+                      request->bmRequestType,
+                      request->bRequest,
+                      request->wValue,
+                      request->wIndex,
+                      request->wLength);
+        /* Read payload. */
+        USBD_Read(0, &command, sizeof(command), vr_callback, 0);
         break;
     case USBGenericRequest_IN:  // e.g. 0xC1
         TRACE_WARNING("USBGenericRequest_IN\n\r");
-        USBD_Write(0, dummy, sizeof(dummy), 0, 0);
+        // This crashes hard:
+        // USBD_Write(0, dummy, sizeof(dummy), 0, 0);
         break;
     }
     // USBD_Stall(0);

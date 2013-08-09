@@ -145,7 +145,7 @@ static void CDCDSerialDriver_SetControlLineState(unsigned char activateCarrier,
 void Vendor_RequestHandler(const USBGenericRequest *request);
 void USBDCallbacks_RequestReceived(const USBGenericRequest *request)
 {
-#if 0
+#if 1
     if (USBGenericRequest_GetType(request) == USBGenericRequest_VENDOR) {
         Vendor_RequestHandler(request);
         return;
