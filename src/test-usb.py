@@ -23,7 +23,7 @@ def claim():
 # VENDOR requests
 
 def ctrl_IN():
-    buf=[]
+    buf=[0,0,0,0]
     rv=dh.controlMsg(0xC0,
                      request=123,
                      buffer=buf,
