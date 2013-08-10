@@ -25,12 +25,12 @@ def claim():
 def ctrl_IN():
     return dh.controlMsg(0xC0,
                          request=123,
-                         buffer=4,
+                         buffer=128,
                          value=0,
                          index=0,
                          timeout=500)
 def ctrl_OUT():
-    buf=[1,2,3,4]
+    buf=range(128)
     rv=dh.controlMsg(0x40,
                      request=123,
                      buffer=buf,

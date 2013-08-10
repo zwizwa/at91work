@@ -290,27 +290,28 @@ static void c_apdu_cb(void *ctx, int size) {
    FIXME: should this use INTERFACE requests and define a second interface?
 */
 
-static uint32_t command = 0;
+static uint32_t command[32];
 
 void vr_read_callback(void *arg,
                       unsigned char status,
-                      unsigned int received,
+                      unsigned int transferred,
                       unsigned int remaining) {
-    TRACE_WARNING("vr_read_callback %08x\n\r", command);
-    command = 0;
-
+    TRACE_WARNING("vr_read_callback %d %d\n\r", transferred, remaining);
     USBD_Write(0,0,0,0,0); // status
 }
 
-
+#if 1
 void vr_write_callback(void *arg,
                        unsigned char status,
-                       unsigned int received,
+                       unsigned int transferred,
                        unsigned int remaining) {
-    TRACE_WARNING("vr_write_callback %08x\n\r", command);
-    command = 0;
-    USBD_Read(0,0,0,0,0); // status
+    TRACE_WARNING("vr_write_callback %d %d\n\r", transferred, remaining);
+    /* status: doesn't seem to hurt, but not necessary: ACK is sent by
+       transceiver which is enough for host, then empty paclet is
+       ignored in firmware. */
+    USBD_Read(0,0,0,0,0);
 }
+#endif
 
 
 void Vendor_RequestHandler(const USBGenericRequest *request) {
@@ -328,10 +329,8 @@ void Vendor_RequestHandler(const USBGenericRequest *request) {
         break;
     case USBGenericRequest_IN:  // e.g. 0xC0
         TRACE_WARNING("USBGenericRequest_IN\n\r");
-        // USBD_Write(0, &command, sizeof(command), 0, 0);
-        command = 0xAABBCCDD;
         USBD_Write(0, &command, sizeof(command), vr_write_callback, 0);
-        // USBD_Read(0, &command, sizeof(command), vr_read_callback, 0);
+        // USBD_Write(0, &command, sizeof(command), 0, 0);
         break;
     }
     // USBD_Stall(0);
