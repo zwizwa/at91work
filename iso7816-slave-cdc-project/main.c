@@ -292,48 +292,41 @@ static void c_apdu_cb(void *ctx, int size) {
 
 static uint32_t command[32];
 
-void vr_read_callback(void *arg,
-                      unsigned char status,
-                      unsigned int transferred,
-                      unsigned int remaining) {
-    TRACE_WARNING("vr_read_callback %d %d\n\r", transferred, remaining);
-    USBD_Write(0,0,0,0,0); // status
-}
-
-#if 1
-void vr_write_callback(void *arg,
+static void vr_read_cb(void *arg,
                        unsigned char status,
                        unsigned int transferred,
                        unsigned int remaining) {
-    TRACE_WARNING("vr_write_callback %d %d\n\r", transferred, remaining);
-    /* status: doesn't seem to hurt, but not necessary: ACK is sent by
-       transceiver which is enough for host, then empty paclet is
-       ignored in firmware. */
-    USBD_Read(0,0,0,0,0);
+    TRACE_WARNING("CONTROL OUT %d\n\r", transferred);
+    USBD_Write(0,0,0,0,0); // STATUS
 }
-#endif
 
+static void vr_write_cb(void *arg,
+                        unsigned char status,
+                        unsigned int transferred,
+                        unsigned int remaining) {
+    USBD_Read(0,0,0,0,0); // STATUS
+}
+
+/* Control  in  = SETUP IN [IN ...] STATUS(=OUT)
+   Countrol out = SETUP OUT [OUT ...] STATUS(=IN) */
 
 void Vendor_RequestHandler(const USBGenericRequest *request) {
-    TRACE_WARNING("Vendor_RequestHandler\n\r");
+    TRACE_DEBUG("Vendor_RequestHandler %02X %d %d %d %d\n\r",
+                request->bmRequestType,
+                request->bRequest,
+                request->wValue,
+                request->wIndex,
+                request->wLength);
     switch (USBGenericRequest_GetDirection(request)) {
     case USBGenericRequest_OUT: // e.g 0x40
-        TRACE_WARNING("USBGenericRequest_OUT %02X %d %d %d %d\n\r",
-                      request->bmRequestType,
-                      request->bRequest,
-                      request->wValue,
-                      request->wIndex,
-                      request->wLength);
         /* Read payload. */
-        USBD_Read(0, &command, sizeof(command), vr_read_callback, 0);
+        USBD_Read(0, &command, sizeof(command), vr_read_cb, 0);
         break;
     case USBGenericRequest_IN:  // e.g. 0xC0
-        TRACE_WARNING("USBGenericRequest_IN\n\r");
-        USBD_Write(0, &command, sizeof(command), vr_write_callback, 0);
-        // USBD_Write(0, &command, sizeof(command), 0, 0);
+        TRACE_WARNING("CONTROL IN %d\n\r", request->wLength);
+        USBD_Write(0, &command, sizeof(command), vr_write_cb, 0);
         break;
     }
-    // USBD_Stall(0);
 }
 
 
