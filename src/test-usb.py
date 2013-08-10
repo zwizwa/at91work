@@ -23,14 +23,12 @@ def claim():
 # VENDOR requests
 
 def ctrl_IN():
-    buf=[0,0,0,0]
-    rv=dh.controlMsg(0xC0,
-                     request=123,
-                     buffer=buf,
-                     value=0,
-                     index=0,
-                     timeout=500)
-    return rv, buf
+    return dh.controlMsg(0xC0,
+                         request=123,
+                         buffer=4,
+                         value=0,
+                         index=0,
+                         timeout=500)
 def ctrl_OUT():
     buf=[1,2,3,4]
     rv=dh.controlMsg(0x40,
