@@ -54,22 +54,26 @@ def ctrl_IN(req):
                          request=req,
                          buffer=512,
                          timeout=500)
-UC_COMMAND = 1
-UC_C_APDU  = 2
-UC_R_APDU  = 3
+
+CMD_SET_ATR  = 0
+CMD_SET_SKIP = 1
+CMD_HALT     = 2
+CMD_C_APDU   = 3
+CMD_R_APDU   = 4
+
 
 def c_apdu():
     cla = 0xFF
     msg = []
     while (cla == 0xFF):
-        msg = ctrl_IN(UC_C_APDU)
+        msg = ctrl_IN(CMD_C_APDU)
         cla = msg[0]
     log("C-APDU:%s\n" % bytes2hex(msg))
     return msg
 
 def r_apdu(msg):
     log("R-APDU:%s\n" % bytes2hex(msg))
-    ctrl_OUT(UC_R_APDU, msg)
+    ctrl_OUT(CMD_R_APDU, msg)
 
 
 
@@ -148,16 +152,9 @@ def u32(val):
             (val >> 16) & 0xFF,
             (val >> 24) & 0xFF];
 
-CMD_SET_ATR  = u32(0)
-CMD_SET_SKIP = u32(1)
-CMD_HALT     = u32(2)
-
-
-def command(tag, payload=[0,0,0,0]):
-    msg = list(tag)
-    msg.extend(payload)
-    log("CMD:%s\n" % bytes2hex(msg))
-    ctrl_OUT(UC_COMMAND, msg)
+def command(tag, payload=[0]):  # dummy byte
+    log("CMD %d %s\n" % (tag, bytes2hex(payload)))
+    ctrl_OUT(tag, payload)
 
 def tick():
     c = c_apdu()

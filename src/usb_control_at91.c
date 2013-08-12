@@ -19,7 +19,7 @@
 /* Pseudo-NAK: 0xFF is an invalid device class. */
 static const uint8_t idle[] = {0xFF, 0, 0, 0, 0};
 
-enum simtrace_usb_control_request from_host_cmd;
+enum iso7816_slave_command_tag from_host_cmd;
 static uint8_t from_host_buf[512];
 static int from_host_size;
 
@@ -39,21 +39,13 @@ static void read_cb(void *arg,
     }
 
     TRACE_DEBUG("CONTROL OUT %d %d\n\r", transferred, remaining);
-
-    switch(from_host_cmd) {
-    case UC_COMMAND:
-        iso7816_slave_command(iso7816_slave, from_host_buf, from_host_size);
-        break;
-    case UC_R_APDU:
-        iso7816_slave_r_apdu_write(iso7816_slave, from_host_buf, from_host_size);
-        break;
-    default:
-        TRACE_ERROR("invalid OUT command %d\n\r", from_host_cmd);
-        USBD_Stall(0);
-        return;
+    if (!iso7816_slave_command(iso7816_slave, from_host_cmd,
+                               from_host_buf, from_host_size)) {
+        USBD_Write(0,0,0,0,0); // STATUS
     }
-
-    USBD_Write(0,0,0,0,0); // STATUS
+    else {
+        USBD_Stall(0);
+    }
 }
 
 static void write_cb(void *arg,
@@ -90,7 +82,7 @@ void usb_control_vendor_request(const USBGenericRequest *request) {
     case USBGenericRequest_IN:  // e.g. 0xC0
         TRACE_DEBUG("CONTROL IN %d\n\r", request->wLength);
         switch(from_host_cmd) {
-        case UC_C_APDU:
+        case CMD_C_APDU:
             if (to_host_buf) {
                 USBD_Write(0, to_host_buf, to_host_size, write_cb, 0);
                 to_host_buf = NULL;

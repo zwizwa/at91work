@@ -186,61 +186,24 @@ struct iso7816_slave *iso7816_slave;
 
 static char hexout_buf[DATABUFFERSIZE];
 
+// FIXME: CDC EPs are not used in this example
 
 //------------------------------------------------------------------------------
 /// Callback invoked when data has been received on the USB.
 //------------------------------------------------------------------------------
 static void UsbDataReceived(unsigned int unused,
                             unsigned char status,
-                            unsigned int received,
+                            unsigned int received,  /* nb bytes in usbBuffer */
                             unsigned int remaining)
 {
     // Check that data has been received successfully
     if (status == USBD_STATUS_SUCCESS) {
-
-        //usbBuffer[received] = 0; // FIXME: hack!
-        //TRACE_DEBUG("usb_in: %s\n\r", usbBuffer);
-
-        int i;
-        for (i=0; i<received; i++) {
-            int rv = hexin_push(&h, usbBuffer[i]);
-            if (rv > 0) {
-                /* Binary packet received: route it. */
-                if (rv < 2) {
-                    TRACE_ERROR("Short packet, size %d\n\r", rv);
-                }
-                else {
-                    uint16_t sw = hexin_buf[rv-1] + (hexin_buf[rv-2]<<8);
-                    switch(sw) {
-                    case 0xFFFF:
-                        /* Unused R-APDU status word: we use this as protocol escape.
-                           FIXME: Might want to do this better */
-                        iso7816_slave_command(iso7816_slave, hexin_buf, rv-2);
-                        break;
-                    default:
-                        iso7816_slave_r_apdu_write(iso7816_slave, hexin_buf, rv);
-                        break;
-                    }
-                }
-
-                /* Prepare to receive next. */
-                hexin_reset(&h);
-                bzero(hexin_buf, sizeof(hexin_buf));
-            }
-        }
-
-        // Check if bytes have been discarded
-        if ((received == DATABUFFERSIZE) && (remaining > 0)) {
-            TRACE_WARNING(
-                      "UsbDataReceived: %u bytes discarded\n\r",
-                      remaining);
-        }
+        // ...
     }
     else {
 
         TRACE_WARNING( "UsbDataReceived: Transfer error\n\r");
     }
-
 
     // Make sure we get activated next time.
     CDCDSerialDriver_Read(usbBuffer,
@@ -250,44 +213,21 @@ static void UsbDataReceived(unsigned int unused,
 }
 
 
-
+#if 0
 /* Transfer next chunk of HEX data until done. */
 static void UsbDataSent(void *pArg,
                         unsigned char status,
                         unsigned int transferred,
                         unsigned int remaining)
 {
-    // FIXME: handle errors.  Function args are ignored.
-
-    int char_index = 0;
-    int rv = 0;
-    while((char_index < (DATABUFFERSIZE-1)) &&
-          ((rv = iso7816_slave_c_apdu_getc(iso7816_slave)) >= 0)) {
-        sprintf(hexout_buf + char_index, "%02X", (uint8_t)rv);
-        char_index += 2;
-    }
-    TransferCallback callback;
-    if (rv < 0) {
-        // Don't print \r -> python readline() don't like
-        sprintf(hexout_buf + char_index, "\n");
-        callback = NULL;
-    }
-    else {
-        // Send more later.
-        callback = UsbDataSent;
-    }
-    CDCDSerialDriver_Write(hexout_buf, strlen(hexout_buf),
-                           callback, 0);
+    // Once data is sent, optionally send some more..
+    // CDCDSerialDriver_Write(<buf>, <size>, callback, 0);
 }
+#endif
 
 void usb_control_c_apdu(const uint8_t *buf, int size);
 static void c_apdu_cb(void *ctx, const uint8_t *buf, int size) {
-    if (0) {
-        UsbDataSent(0, 0, 0, 0);  // CDC
-    }
-    else {
-        usb_control_c_apdu(buf, size); // control requests
-    }
+    usb_control_c_apdu(buf, size); // control requests
 }
 
 

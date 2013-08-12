@@ -251,23 +251,6 @@ static void next_receive_S_TPDU(struct iso7816_slave *s) {
 }
 
 
-
-int iso7816_slave_c_apdu_getc(struct iso7816_slave *s) {
-    /* During the request delegation phase, we provide C-APDU, one
-       byte at a time.  Delegate will call iso7816_slave_r_apdu() to
-       continue processing. */
-    if (s->state != S_TPDU_WAIT_REPLY) {
-        TRACE_ERROR("iso7816_slave_c_apdu_read state %d\n", s->state);
-        return -EIO;
-    }
-    if (s->io_ptr >= (s->msg.buf + s->c_apdu_size)) {
-        return -EIO; // FIXME: what error to use?
-    }
-    else {
-        return *(s->io_ptr)++;
-    }
-}
-
 static void iso7816_slave_print_apdu(struct iso7816_slave *s) {
     int i;
     const uint8_t *b = s->msg.buf;
@@ -291,34 +274,43 @@ int iso7816_slave_r_apdu_write(struct iso7816_slave *s, const uint8_t *buf, int 
 }
 
 // Send a-synchronous command to state machine.
-int iso7816_slave_command(struct iso7816_slave *s, const uint8_t *buf, int size) {
-    struct iso7816_slave_command *c = (void*)buf;
-    int buf_size = size - offsetof(typeof(*c), data);
-    if (size < sizeof(*c)) {
-        TRACE_ERROR("Short command packet: %d bytes\n\r", size);
-        return -EIO;
-    }
-    switch(c->command) {
+int iso7816_slave_command(struct iso7816_slave *s,
+                          enum iso7816_slave_command_tag cmd,
+                          const uint8_t *buf, int buf_size) {
+    switch(cmd) {
     case CMD_SET_ATR:
         TRACE_WARNING("CMD_SET_ATR\n\r");
         if (buf_size > sizeof(s->atr)) {
             TRACE_ERROR("ATR too large! %d > %d\n\r", buf_size, sizeof(s->atr));
         }
         else {
-            memcpy(s->atr, c->data.buf, buf_size);
+            memcpy(s->atr, buf, buf_size);
             s->atr_size = buf_size;
         }
         break;
     case CMD_SET_SKIP:
-         TRACE_WARNING("CMD_SET_SKIP %d\n\r", c->data.u32);
-         s->skip_power = c->data.u32;
-         break;
+        if (buf_size < sizeof(s->skip_power)) {
+            TRACE_ERROR("CMD_SET_SKIP data size incorrect: %d\n\r", buf_size);
+        }
+        else {
+            memcpy(&s->skip_power, buf, sizeof(s->skip_power));
+            TRACE_WARNING("CMD_SET_SKIP %d\n\r", s->skip_power);
+        }
+        break;
     case CMD_HALT:
-         TRACE_WARNING("CMD_HALT\n\r");
-         s->state = S_HALT;
-         break;
+        TRACE_WARNING("CMD_HALT\n\r");
+        s->state = S_HALT;
+        break;
+    case CMD_R_APDU:
+        TRACE_WARNING("CMD_R_APDU %02x%02x\n\r",
+                      buf[buf_size-2],
+                      buf[buf_size-1]);
+        iso7816_slave_r_apdu_write(s, buf, buf_size);
+        break;
+    // caseCMD_C_APDU = IN command
     default:
-        TRACE_ERROR("Unknown command %d, %d bytes\n\r", c->command, size);
+        TRACE_ERROR("Invalid command %d, %d bytes\n\r", cmd, buf_size);
+        return -EIO;
         break;
     }
     return ENOERR;
