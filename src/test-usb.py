@@ -10,8 +10,8 @@ def find(idVendor, idProduct):
                 return dev
     return 'wrong'
 
-# dev = find(idVendor=0x03eb, idProduct=0x6119) # CDC
-dev = find(idVendor=0x03eb, idProduct=0x6129)  # CCID
+dev = find(idVendor=0x03eb, idProduct=0x6119) # CDC
+# dev = find(idVendor=0x03eb, idProduct=0x6129)  # CCID
 dh  = dev.open()
 # dh.detachKernelDriver(0)
 

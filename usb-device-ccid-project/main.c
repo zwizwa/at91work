@@ -524,7 +524,7 @@ static void c_apdu_cb(void *ctx, int size) {
 /// \return Unused (ANSI-C compatibility)
 //------------------------------------------------------------------------------
 
-static struct iso7816_slave *iso7816_slave;
+struct iso7816_slave *iso7816_slave;
 
 int main( void )
 {

@@ -17,6 +17,9 @@ from smartcard.System import readers
 from smartcard.util import toHexString
 import subprocess
 
+log = sys.stderr.write
+
+
 
 # connect to card
 r = readers()
@@ -26,13 +29,15 @@ c.connect()
 
 
 
+
+
+
 def bytes2hex(bytes):
     return "".join(map(lambda v: "%02X"%v, bytes))
 
 def hex2bytes(hex):
     return map(ord,hex.decode("hex"))
 
-log = sys.stderr.write
 
 
 # log("ATR = {%s}\n" % "".join(map(lambda v: "0x%02x, " % v, c.getATR())))
