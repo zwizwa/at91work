@@ -9,7 +9,6 @@
 
 force_SIM = True
 # force_SIM = False
-use_cdc = False
 
 
 import sys
@@ -20,7 +19,16 @@ import subprocess
 
 log = sys.stderr.write
 
-# USB vendor requests
+
+def bytes2hex(bytes):
+    return "".join(map(lambda v: "%02X"%v, bytes))
+
+def hex2bytes(hex):
+    return map(ord,hex.decode("hex"))
+
+
+
+# APDUs go over USB vendor control requests
 import usb
 def find(idVendor, idProduct):
     busses = usb.busses()
@@ -46,8 +54,22 @@ def ctrl_IN(req):
                          request=req,
                          buffer=512,
                          timeout=500)
-    
+UC_COMMAND = 1
+UC_C_APDU  = 2
+UC_R_APDU  = 3
 
+def c_apdu():
+    cla = 0xFF
+    msg = []
+    while (cla == 0xFF):
+        msg = ctrl_IN(UC_C_APDU)
+        cla = msg[0]
+    log("C-APDU:%s\n" % bytes2hex(msg))
+    return msg
+
+def r_apdu(msg):
+    log("R-APDU:%s\n" % bytes2hex(msg))
+    ctrl_OUT(UC_R_APDU, msg)
 
 
 
@@ -62,12 +84,6 @@ c.connect()
 
 
 
-
-def bytes2hex(bytes):
-    return "".join(map(lambda v: "%02X"%v, bytes))
-
-def hex2bytes(hex):
-    return map(ord,hex.decode("hex"))
 
 
 
@@ -92,21 +108,22 @@ def pretty_apdu(msg):
   except:
     pass
 
-def pack(data,sw1,sw2):
-    data.append(sw1)
-    data.append(sw2)
-    return data
+def pack(reply,sw1,sw2):
+    p = list(reply)
+    p.append(sw1)
+    p.append(sw2)
+    return p
 
 
 # Delegate APDU handling to card.
-def delegate(msg):
-    data, sw1, sw2 = c.transmit( msg )
+def default_delegate(msg):
+    data, sw1, sw2 = c.transmit( list(msg) )
     return pack(data,sw1,sw2)
 
 
 # Perform APDU request on card
-def apdu(msg, handle = delegate):
-    pretty_apdu(msg)
+def apdu(msg, delegate = default_delegate):
+    pretty_apdu( msg )
 
     # Force SIM protocol for USIM cards.
     if (force_SIM):
@@ -114,53 +131,14 @@ def apdu(msg, handle = delegate):
             return [0x6E, 0x00]
 
     if (msg[1] == 0x10): # TERMINAL_PROFILE
-        data, sw1, sw2 = c.transmit( msg )
+        data, sw1, sw2 = c.transmit( list(msg) )
         # Make phone poll for command
         # return pack(data,0x91,0x20)
         return pack(data,sw1,sw2)
 
-    else:
-        return handle(msg)
-    
+    # Delegate to MIM.
+    return delegate( msg )
 
-    # Delegate to card.
-    data, sw1, sw2 = handle( msg )
-    data.append(sw1)
-    data.append(sw2)
-    return data
-
-def apdu_hex(hex):
-    return bytes2hex(apdu(hex2bytes(hex)))
-
-def c_apdu():
-    if use_cdc:
-        str = sys.stdin.readline().rstrip()
-    else:
-        cla = 0xFF
-        str = ""
-        while (cla == 0xFF):
-            msg = ctrl_IN(1)
-            cla = msg[0]
-            str = bytes2hex(msg)
-
-    log("C-APDU:%s\n" % str)
-    return str
-
-
-def to_phone(str):
-    if use_cdc:
-        sys.stdout.write("%s\n" % str)
-        sys.stdout.flush()
-    else:
-        ctrl_OUT(1, hex2bytes(str))
-
-def r_apdu(str):
-    log("R-APDU:%s\n\n" % str)
-    to_phone(str)
-
-
-# FIXME: iso7816 parser control is currently embedded in R-APDU packet
-# with SW=0xFFFF
 
 # see iso7816_slave.h
 # AT91 is little endian.
@@ -174,26 +152,33 @@ CMD_SET_ATR  = u32(0)
 CMD_SET_SKIP = u32(1)
 CMD_HALT     = u32(2)
 
+
 def command(tag, payload=[0,0,0,0]):
-    b = tag
-    b.extend(payload)
-    b.extend([0xFF, 0xFF])
-    str = bytes2hex(b)
-    log("COMMAND:%s\n\n" % str)
-    to_phone(str)
+    msg = list(tag)
+    msg.extend(payload)
+    log("CMD:%s\n" % bytes2hex(msg))
+    ctrl_OUT(UC_COMMAND, msg)
+
+def tick():
+    c = c_apdu()
+    r = apdu(c)
+    r_apdu(r)
 
 def mainloop():
     while 1:
-        r_apdu(apdu_hex(c_apdu()))
+        tick()
 
 command(CMD_SET_ATR, c.getATR())
 command(CMD_SET_SKIP, u32(2))
 command(CMD_HALT)
 
 # reset android phone
-subprocess.call(["adb", "shell", "reboot"])
+def reboot():
+    subprocess.call(["adb", "shell", "reboot"])
+
 
 # start handling incoming phone C-APDUs
+reboot()
 mainloop()
 
 
