@@ -142,12 +142,12 @@ static void CDCDSerialDriver_SetControlLineState(unsigned char activateCarrier,
 //------------------------------------------------------------------------------
 /// Re-implemented callback, invoked when a new USB Request is received.
 //------------------------------------------------------------------------------
-void Vendor_RequestHandler(const USBGenericRequest *request);
+void usb_control_vendor_request(const USBGenericRequest *request);
 void USBDCallbacks_RequestReceived(const USBGenericRequest *request)
 {
 #if 1
     if (USBGenericRequest_GetType(request) == USBGenericRequest_VENDOR) {
-        Vendor_RequestHandler(request);
+        usb_control_vendor_request(request);
         return;
     }
 #endif

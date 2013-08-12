@@ -31,8 +31,12 @@ static void read_cb(void *arg,
                     unsigned int transferred,
                     unsigned int remaining) {
 
-    TRACE_WARNING("CONTROL OUT %d\n\r", transferred);
-    USBD_Write(0,0,0,0,0); // STATUS
+    if (status != USBD_STATUS_SUCCESS) {
+        TRACE_WARNING( "UsbDataReceived: Transfer error\n\r");
+        return;
+    }
+
+    TRACE_WARNING("CONTROL OUT %d %d\n\r", transferred, remaining);
 
     /* FIXME: Expected structure is R-APDU or SIMtrace slave mode
        command encapsulated in SW=FFFF */
@@ -41,8 +45,10 @@ static void read_cb(void *arg,
     }
     else {
         int cmd_size = from_host_size - 2;
-        uint16_t sw = (from_host_buf[cmd_size]<<8) + from_host_buf[cmd_size+1]; // BE
-        switch(sw) {
+        uint8_t *sw = &from_host_buf[cmd_size];
+        uint16_t sw16 = (sw[0]<<8) + sw[1]; // BE
+        TRACE_WARNING("%04X\n\r", sw16);
+        switch(sw16) {
         case 0xFFFF:
             /* Unused R-APDU status word: we use this as protocol escape.
                FIXME: Might want to do this better */
@@ -53,6 +59,8 @@ static void read_cb(void *arg,
             break;
         }
     }
+
+    USBD_Write(0,0,0,0,0); // STATUS
 }
 
 static void write_cb(void *arg,
@@ -77,9 +85,9 @@ void usb_control_vendor_request(const USBGenericRequest *request) {
     case USBGenericRequest_OUT: // e.g 0x40
         /* Read payload. */
         from_host_size =  request->wLength;
-        if (request->wLength < sizeof(request)) {
+        if (request->wLength > sizeof(from_host_buf)) {
             TRACE_ERROR("invalid length: %d\n\r", request->wLength);
-            from_host_size = sizeof(request);
+            from_host_size = sizeof(from_host_buf);
         }
         USBD_Read(0, &from_host_buf, from_host_size, read_cb, 0);
         break;

@@ -19,6 +19,28 @@ import subprocess
 
 log = sys.stderr.write
 
+# USB vendor requests
+import usb
+def find(idVendor, idProduct):
+    busses = usb.busses()
+    for bus in busses:
+        devices = bus.devices
+        for dev in devices:
+            if ((dev.idVendor  == idVendor) and
+                (dev.idProduct == idProduct)):
+                return dev
+    return 'wrong'
+dev = find(idVendor=0x03eb, idProduct=0x6119) # CDC
+# dev = find(idVendor=0x03eb, idProduct=0x6129)  # CCID
+dh  = dev.open()
+def ctrl_OUT(req, buf):
+    rv=dh.controlMsg(0x40,
+                     request=req,    # R-APDU
+                     buffer=buf,
+                     timeout=500)
+    return rv
+
+
 
 
 # connect to card
@@ -106,10 +128,14 @@ def c_apdu():
     log("C-APDU:%s\n" % str)
     return str
 
+use_cdc = False
 
 def to_phone(str):
-    sys.stdout.write("%s\n" % str)
-    sys.stdout.flush()
+    if use_cdc:
+        sys.stdout.write("%s\n" % str)
+        sys.stdout.flush()
+    else:
+        ctrl_OUT(1, hex2bytes(str))
 
 def r_apdu(str):
     log("R-APDU:%s\n\n" % str)
