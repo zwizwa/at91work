@@ -76,7 +76,13 @@ void usb_control_vendor_request(const USBGenericRequest *request) {
             TRACE_ERROR("invalid length: %d\n\r", request->wLength);
             from_host_size = sizeof(from_host_buf);
         }
-        USBD_Read(0, &from_host_buf, from_host_size, read_cb, 0);
+        if (from_host_size) {
+            USBD_Read(0, &from_host_buf, from_host_size, read_cb, 0);
+        }
+        else {
+            USBD_Write(0,0,0,0,0); // STATUS
+        }
+
         break;
 
     case USBGenericRequest_IN:  // e.g. 0xC0

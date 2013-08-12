@@ -152,7 +152,7 @@ def u32(val):
             (val >> 16) & 0xFF,
             (val >> 24) & 0xFF];
 
-def command(tag, payload=[0]):  # dummy byte
+def command(tag, payload=[]):  # dummy byte
     log("CMD %d %s\n" % (tag, bytes2hex(payload)))
     ctrl_OUT(tag, payload)
 
