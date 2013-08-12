@@ -55,6 +55,7 @@ def ctrl_IN(req):
                          buffer=512,
                          timeout=500)
 
+# see iso7816_slave.h 
 CMD_SET_ATR  = 0
 CMD_SET_SKIP = 1
 CMD_HALT     = 2
@@ -63,11 +64,9 @@ CMD_R_APDU   = 4
 
 
 def c_apdu():
-    cla = 0xFF
     msg = []
-    while (cla == 0xFF):
+    while (not len(msg)):
         msg = ctrl_IN(CMD_C_APDU)
-        cla = msg[0]
     log("C-APDU:%s\n" % bytes2hex(msg))
     return msg
 

@@ -302,12 +302,13 @@ int iso7816_slave_command(struct iso7816_slave *s,
         s->state = S_HALT;
         break;
     case CMD_R_APDU:
-        TRACE_WARNING("CMD_R_APDU %02x%02x\n\r",
-                      buf[buf_size-2],
-                      buf[buf_size-1]);
+        TRACE_DEBUG("CMD_R_APDU %02x%02x\n\r",
+                    buf[buf_size-2],
+                    buf[buf_size-1]);
         iso7816_slave_r_apdu_write(s, buf, buf_size);
         break;
-    // caseCMD_C_APDU = IN command
+    // IN commands, not handled here:
+    // caseCMD_C_APDU:
     default:
         TRACE_ERROR("Invalid command %d, %d bytes\n\r", cmd, buf_size);
         return -EIO;

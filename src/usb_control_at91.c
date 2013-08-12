@@ -16,9 +16,6 @@
    FIXME: should this use INTERFACE requests together with a second
    interface to allow this to work on Windows? */
 
-/* Pseudo-NAK: 0xFF is an invalid device class. */
-static const uint8_t idle[] = {0xFF, 0, 0, 0, 0};
-
 enum iso7816_slave_command_tag from_host_cmd;
 static uint8_t from_host_buf[512];
 static int from_host_size;
@@ -37,8 +34,6 @@ static void read_cb(void *arg,
         TRACE_ERROR( "UsbDataReceived: Transfer error\n\r");
         return;
     }
-
-    TRACE_DEBUG("CONTROL OUT %d %d\n\r", transferred, remaining);
     if (!iso7816_slave_command(iso7816_slave, from_host_cmd,
                                from_host_buf, from_host_size)) {
         USBD_Write(0,0,0,0,0); // STATUS
@@ -86,7 +81,6 @@ void usb_control_vendor_request(const USBGenericRequest *request) {
         break;
 
     case USBGenericRequest_IN:  // e.g. 0xC0
-        TRACE_DEBUG("CONTROL IN %d\n\r", request->wLength);
         switch(from_host_cmd) {
         case CMD_C_APDU:
             if (to_host_buf) {
@@ -95,8 +89,8 @@ void usb_control_vendor_request(const USBGenericRequest *request) {
                 to_host_size = 0;
             }
             else {
-                /* Control requests can't NAK, so use a sentinel. */
-                USBD_Write(0, &idle, sizeof(idle), write_cb, 0);
+                /* Control requests can't NAK, so use an empty sentinel. */
+                USBD_Write(0, 0, 0, write_cb, 0);
             }
             break;
         default:
