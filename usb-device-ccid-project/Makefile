@@ -45,12 +45,11 @@ BOARD = simtrace
 # TRACE_LEVEL_ERROR      2
 # TRACE_LEVEL_FATAL      1
 # TRACE_LEVEL_NO_TRACE   0
-TRACE_LEVEL = 5
+TRACE_LEVEL = 3
 
 # Optimization level, put in comment for debugging
 # OPTIMIZATION = -Os
-# OPTIMIZATION = -O0 -Wno-unused-but-set-variable
-OPTIMIZATION = -Os -Wno-unused-but-set-variable
+OPTIMIZATION = -Os -Wno-format -Werror -Wno-unused-but-set-variable -Wno-unused-variable
 
 # AT91 library directory
 AT91LIB = ../at91lib
@@ -81,6 +80,7 @@ OBJCOPY = $(CROSS_COMPILE)objcopy
 # Flags
 INCLUDES = -I$(AT91LIB)/boards/$(BOARD) -I$(AT91LIB)/peripherals 
 INCLUDES += -I$(AT91LIB)/components -I$(AT91LIB)
+INCLUDES += -I../src
 
 CFLAGS = -Wall -mlong-calls -ffunction-sections
 CFLAGS += -g $(OPTIMIZATION) $(INCLUDES) -D$(CHIP) -DTRACE_LEVEL=$(TRACE_LEVEL)
@@ -106,6 +106,9 @@ VPATH += $(PERIPH)/cp15
 VPATH += $(BOARDS)/$(BOARD) $(BOARDS)/$(BOARD)/$(CHIP)
 VPATH += $(USB)/device/ccid $(COMP)/iso7816 $(PERIPH)/usart
 
+# GPL code
+VPATH += ../src  
+
 # Objects built from C source files
 C_OBJECTS = main.o
 C_OBJECTS += USBD_OTGHS.o USBD_UDP.o USBD_UDPHS.o USBDDriver.o
@@ -123,6 +126,10 @@ C_OBJECTS += led.o math.o stdio.o
 C_OBJECTS += aic.o dbgu.o pio.o pio_it.o pit.o pmc.o cp15.o
 C_OBJECTS += board_memories.o board_lowlevel.o
 C_OBJECTS += usart.o iso7816_4.o cciddriver.o
+
+# GPL code
+C_OBJECTS += usb_control_at91.o
+C_OBJECTS += iso7816_at91.o iso7816_slave.o
 
 # Objects built from Assembly source files
 ASM_OBJECTS = board_cstartup.o

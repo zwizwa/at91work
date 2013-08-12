@@ -55,6 +55,11 @@
 #include <iso7816/iso7816_4.h>
 #include <string.h>
 
+// Due to lack of physical endpoints, the SIMtrace phone interface is
+// handled by control requests over EP0
+void SIMtrace_Vendor_RequestHandler(const USBGenericRequest *request);
+
+
 //------------------------------------------------------------------------------
 //         Local definition
 //------------------------------------------------------------------------------
@@ -1368,6 +1373,11 @@ static void CCID_RequestHandler(const USBGenericRequest *pRequest)
 
         // Forward request to the standard handler
         USBDDriver_RequestHandler(&(ccidDriver.usbdDriver), pRequest);
+    }
+    else if (USBGenericRequest_GetType(pRequest) == USBGenericRequest_VENDOR) {
+
+        // Forward SIMtrace VENDOR request.
+        SIMtrace_Vendor_RequestHandler(pRequest);
     }
     else {
 

@@ -250,5 +250,6 @@
 // disabled: pcscd doesn't like this
 //#define BOARD_USB_DFU
 
+
 #endif //#ifndef BOARD_H
 

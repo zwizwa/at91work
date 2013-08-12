@@ -120,6 +120,7 @@
 #include <pmc/pmc.h>
 
 #include <string.h>
+#include "iso7816_slave.h"
 
 //-----------------------------------------------------------------------------
 //         Local Define
@@ -507,6 +508,13 @@ void USBDCallbacks_Suspended(void)
 }
 
 
+/* Patch iso7816 parser to USB control transfer. */
+static void c_apdu_cb(void *ctx, int size) {
+    // UsbDataSent(0, 0, 0, 0);
+}
+
+
+
 //------------------------------------------------------------------------------
 //         Exported functions
 //------------------------------------------------------------------------------
@@ -515,6 +523,9 @@ void USBDCallbacks_Suspended(void)
 /// Initializes the CCID driver and runs it.
 /// \return Unused (ANSI-C compatibility)
 //------------------------------------------------------------------------------
+
+static struct iso7816_slave *iso7816_slave;
+
 int main( void )
 {
     // Initialize traces
@@ -548,8 +559,15 @@ int main( void )
     // FIXME: What if there is no card?
     CCID_Insertion();
 
+    /* Init phone ISO7816 USART */
+    iso7816_slave = iso7816_slave_init(c_apdu_cb, NULL);
+
     // Infinite loop
     while (1) {
+
+        // Poll I/O state machine.  FIXME: disable interrupts as there
+        // is contention with USB callbacks.
+        iso7816_slave_tick(iso7816_slave);
 
         if( USBState == STATE_SUSPEND ) {
             TRACE_DEBUG("suspend  !\n\r");
