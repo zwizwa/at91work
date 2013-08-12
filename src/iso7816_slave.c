@@ -478,8 +478,8 @@ void iso7816_slave_tick(struct iso7816_slave *s) {
         /* All C-APDU data is in.  Pass it to handler. */
         TRACE_DEBUG("S_TPDU_DATA\n\r");
         s->state = S_TPDU_WAIT_REPLY;
-        s->io_ptr = s->msg.buf;
-        s->c_apdu_cb(s->c_apdu_ctx, s->c_apdu_size);
+        s->io_ptr = s->msg.buf; // FIXME: not necessary after remove of getc method
+        s->c_apdu_cb(s->c_apdu_ctx, s->msg.buf, s->c_apdu_size);
         break;
     case S_TPDU_WAIT_REPLY:
         /* Wait for data provided by is7816_slave_r_apdu() */

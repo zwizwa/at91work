@@ -280,8 +280,14 @@ static void UsbDataSent(void *pArg,
                            callback, 0);
 }
 
-static void c_apdu_cb(void *ctx, int size) {
-    UsbDataSent(0, 0, 0, 0);
+void usb_control_c_apdu(const uint8_t *buf, int size);
+static void c_apdu_cb(void *ctx, const uint8_t *buf, int size) {
+    if (0) {
+        UsbDataSent(0, 0, 0, 0);  // CDC
+    }
+    else {
+        usb_control_c_apdu(buf, size); // control requests
+    }
 }
 
 

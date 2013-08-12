@@ -9,6 +9,7 @@
 
 force_SIM = True
 # force_SIM = False
+use_cdc = False
 
 
 import sys
@@ -39,6 +40,14 @@ def ctrl_OUT(req, buf):
                      buffer=buf,
                      timeout=500)
     return rv
+
+def ctrl_IN(req):
+    return dh.controlMsg(0xC0,
+                         request=req,
+                         buffer=512,
+                         timeout=500)
+    
+
 
 
 
@@ -124,11 +133,19 @@ def apdu_hex(hex):
     return bytes2hex(apdu(hex2bytes(hex)))
 
 def c_apdu():
-    str = sys.stdin.readline().rstrip()
+    if use_cdc:
+        str = sys.stdin.readline().rstrip()
+    else:
+        cla = 0xFF
+        str = ""
+        while (cla == 0xFF):
+            msg = ctrl_IN(1)
+            cla = msg[0]
+            str = bytes2hex(msg)
+
     log("C-APDU:%s\n" % str)
     return str
 
-use_cdc = False
 
 def to_phone(str):
     if use_cdc:

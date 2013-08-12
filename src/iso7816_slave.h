@@ -16,7 +16,7 @@
 struct iso7816_slave;
 
 // Callback to initiate C-APDU packet transfer.
-typedef void (*iso7816_slave_c_apdu_t)(void *ctx, int size);
+typedef void (*iso7816_slave_c_apdu_t)(void *ctx, const uint8_t *buf, int size);
 // Obtain next C-APDU byte.  rv >= 0 is byte, other is EOF.
 int iso7816_slave_c_apdu_getc(struct iso7816_slave *s);
 

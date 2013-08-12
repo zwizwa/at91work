@@ -32,11 +32,11 @@ static void read_cb(void *arg,
                     unsigned int remaining) {
 
     if (status != USBD_STATUS_SUCCESS) {
-        TRACE_WARNING( "UsbDataReceived: Transfer error\n\r");
+        TRACE_ERROR( "UsbDataReceived: Transfer error\n\r");
         return;
     }
 
-    TRACE_WARNING("CONTROL OUT %d %d\n\r", transferred, remaining);
+    TRACE_DEBUG("CONTROL OUT %d %d\n\r", transferred, remaining);
 
     /* FIXME: Expected structure is R-APDU or SIMtrace slave mode
        command encapsulated in SW=FFFF */
@@ -47,7 +47,7 @@ static void read_cb(void *arg,
         int cmd_size = from_host_size - 2;
         uint8_t *sw = &from_host_buf[cmd_size];
         uint16_t sw16 = (sw[0]<<8) + sw[1]; // BE
-        TRACE_WARNING("%04X\n\r", sw16);
+        TRACE_DEBUG("%04X\n\r", sw16);
         switch(sw16) {
         case 0xFFFF:
             /* Unused R-APDU status word: we use this as protocol escape.
@@ -93,7 +93,7 @@ void usb_control_vendor_request(const USBGenericRequest *request) {
         break;
 
     case USBGenericRequest_IN:  // e.g. 0xC0
-        TRACE_WARNING("CONTROL IN %d\n\r", request->wLength);
+        TRACE_DEBUG("CONTROL IN %d\n\r", request->wLength);
         if (msg_buf) {
             USBD_Write(0, msg_buf, msg_size, write_cb, 0);
             msg_buf = NULL;
@@ -106,8 +106,9 @@ void usb_control_vendor_request(const USBGenericRequest *request) {
     }
 }
 
-void usb_control_to_host(const uint8_t *bytes, int size) {
-    msg_buf  = bytes;
+void usb_control_c_apdu(const uint8_t *buf, int size) {
+    // Set size first; buf != NULL is the trigger condition.
     msg_size = size;
+    msg_buf  = buf;
 }
 
