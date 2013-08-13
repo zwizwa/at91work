@@ -7,8 +7,8 @@
 #   socat /dev/ttyACM0 EXEC:./mim.py
 # 
 
-force_SIM = True
-# force_SIM = False
+# force_SIM = True
+force_SIM = False
 
 
 import sys
@@ -16,6 +16,8 @@ import tag  # some SIM-related constant definitions
 from smartcard.System import readers
 from smartcard.util import toHexString
 import subprocess
+import struct
+import socket
 
 log = sys.stderr.write
 
@@ -23,14 +25,38 @@ log = sys.stderr.write
 def bytes2hex(bytes):
     return "".join(map(lambda v: "%02X"%v, bytes))
 
+def bytes2str(bytes):
+    return struct.pack('B'*len(bytes), *bytes)
+
 def hex2bytes(hex):
     return map(ord,hex.decode("hex"))
 
 
 
+# log APDUs to gsmtap
+gsmtap_hdr = [2, # GSMTAP_VERSION,
+              4, # nb of u32 in header
+              4, # GSMTAP_TYPE_SIM,
+              0,0,0,0,0,0,0,0,0,0,0,0,0]
+
+# gsmtap_addr = ("127.0.0.1", 4729)
+gsmtap_addr = ("<broadcast>", 4729)
+gsmtap_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+gsmtap_sock.bind(('127.0.0.1', 0))
+# broadcast avoids ICMP port unreachable
+gsmtap_sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+
+def gsmtap(c_apdu, r_apdu):
+    msg = list(gsmtap_hdr)
+    msg.extend(c_apdu)
+    msg.extend(r_apdu)
+    gsmtap_sock.sendto(bytes2str(msg), gsmtap_addr)
+
+
+
 # APDUs go over USB vendor control requests
 import usb
-def find(idVendor, idProduct):
+def usb_find(idVendor, idProduct):
     busses = usb.busses()
     for bus in busses:
         devices = bus.devices
@@ -39,40 +65,43 @@ def find(idVendor, idProduct):
                 (dev.idProduct == idProduct)):
                 return dev
     return 'wrong'
-dev = find(idVendor=0x03eb, idProduct=0x6119) # CDC
+dev = usb_find(idVendor=0x03eb, idProduct=0x6119) # CDC
 # dev = find(idVendor=0x03eb, idProduct=0x6129)  # CCID
 dh  = dev.open()
-def ctrl_OUT(req, buf):
+def usb_ctrl_OUT(req, buf):
     rv=dh.controlMsg(0x40,
                      request=req,    # R-APDU
                      buffer=buf,
                      timeout=500)
     return rv
 
-def ctrl_IN(req):
+def usb_ctrl_IN(req):
     return dh.controlMsg(0xC0,
                          request=req,
                          buffer=512,
                          timeout=500)
 
-# see iso7816_slave.h 
+# SIMtrace slave commands, see iso7816_slave.h 
 CMD_SET_ATR  = 0
 CMD_SET_SKIP = 1
 CMD_HALT     = 2
 CMD_C_APDU   = 3
 CMD_R_APDU   = 4
 
-
 def c_apdu():
     msg = []
     while (not len(msg)):
-        msg = ctrl_IN(CMD_C_APDU)
+        msg = usb_ctrl_IN(CMD_C_APDU)
     log("C-APDU:%s\n" % bytes2hex(msg))
     return msg
 
 def r_apdu(msg):
     log("R-APDU:%s\n" % bytes2hex(msg))
-    ctrl_OUT(CMD_R_APDU, msg)
+    usb_ctrl_OUT(CMD_R_APDU, msg)
+
+def command(tag, payload=[]):  # dummy byte
+    log("CMD %d %s\n" % (tag, bytes2hex(payload)))
+    usb_ctrl_OUT(tag, payload)
 
 
 
@@ -82,8 +111,6 @@ r = readers()
 # print r # => ['SCM Microsystems Inc. SCR 331 [CCID Interface] (21121250210402) 00 00']
 c = r[0].createConnection()
 c.connect()
-
-
 
 
 
@@ -103,9 +130,13 @@ def pretty_apdu(msg):
     if (msg[1] == 0xA4): # SELECT_FILE
         file = msg[5] * 256 + msg[6]
         try:
-            log(" %s" % tag.SIMConstants[file])
+            log(" %s" % tag.USIMConstants[file])
         except:
-            log(" %04X" % file)
+            try:
+                log(" %s" % tag.SIMConstants[file])
+            except:
+                log(" %04X" % file)
+                pass
             pass
     log("\n")
   except:
@@ -151,14 +182,12 @@ def u32(val):
             (val >> 16) & 0xFF,
             (val >> 24) & 0xFF];
 
-def command(tag, payload=[]):  # dummy byte
-    log("CMD %d %s\n" % (tag, bytes2hex(payload)))
-    ctrl_OUT(tag, payload)
 
 def tick():
     c = c_apdu()
     r = apdu(c)
     r_apdu(r)
+    gsmtap(c,r)
 
 def mainloop():
     while 1:
@@ -168,7 +197,7 @@ command(CMD_SET_ATR, c.getATR())
 command(CMD_SET_SKIP, u32(2))
 command(CMD_HALT)
 
-# reset android phone
+# reboot android phone
 def reboot():
     subprocess.call(["adb", "shell", "reboot"])
 

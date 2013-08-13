@@ -6,24 +6,26 @@
 #include <string.h>
 #include "iso7816_slave.h"
 
-/* SIMtrace PHONE interface uses VENDOR control requests on EP0 since
-   on AT91SAM7 we don't have enough endpoints for dedicated IN/OUT
-   EPs.
+/* SIMtrace PHONE interface uses VENDOR control requests on EP0:
+   on AT91SAM7 we don't have enough endpoints for dedicated IN/OUT EPs.
 
-   patched cciddriver.c to pass on VENDOR control requests:
-   CCID_RequestHandler() -> usb_control_vendor_request()
+   patch main USB driver request handler to pass on VENDOR control requests:
 
-   FIXME: should this use INTERFACE requests together with a second
-   interface to allow this to work on Windows? */
-
-enum iso7816_slave_command_tag from_host_cmd;
-static uint8_t from_host_buf[512];
-static int from_host_size;
-
-const uint8_t *to_host_buf = NULL;
-int to_host_size = 0;
+   if (USBGenericRequest_GetType(request) == USBGenericRequest_VENDOR) {
+       usb_control_vendor_request(request);
+       return;
+   }
+*/
 
 extern struct iso7816_slave *iso7816_slave;  // main.c
+
+enum iso7816_slave_command_tag command;
+
+static uint8_t from_host_buf[512];
+static int     from_host_size;
+
+static const uint8_t *to_host_buf  = NULL;
+static int            to_host_size = 0;
 
 static void read_cb(void *arg,
                     unsigned char status,
@@ -34,7 +36,7 @@ static void read_cb(void *arg,
         TRACE_ERROR( "UsbDataReceived: Transfer error\n\r");
         return;
     }
-    if (!iso7816_slave_command(iso7816_slave, from_host_cmd,
+    if (!iso7816_slave_command(iso7816_slave, command,
                                from_host_buf, from_host_size)) {
         USBD_Write(0,0,0,0,0); // STATUS
     }
@@ -60,7 +62,7 @@ void usb_control_vendor_request(const USBGenericRequest *request) {
                 request->wValue,
                 request->wIndex,
                 request->wLength);
-    from_host_cmd = request->bRequest;
+    command = request->bRequest;
     switch (USBGenericRequest_GetDirection(request)) {
 
     case USBGenericRequest_OUT: // e.g 0x40
@@ -81,7 +83,7 @@ void usb_control_vendor_request(const USBGenericRequest *request) {
         break;
 
     case USBGenericRequest_IN:  // e.g. 0xC0
-        switch(from_host_cmd) {
+        switch(command) {
         case CMD_C_APDU:
             if (to_host_buf) {
                 USBD_Write(0, to_host_buf, to_host_size, write_cb, 0);
@@ -94,7 +96,7 @@ void usb_control_vendor_request(const USBGenericRequest *request) {
             }
             break;
         default:
-            TRACE_ERROR("invalid IN command %d\n\r", from_host_cmd);
+            TRACE_ERROR("invalid IN command %d\n\r", command);
             USBD_Stall(0);
             break;
         }
