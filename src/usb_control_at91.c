@@ -24,7 +24,9 @@ enum iso7816_slave_command_tag command;
 static uint8_t from_host_buf[512];
 static int     from_host_size;
 
-static const uint8_t *to_host_buf  = NULL;
+static const uint8_t *to_host_msg  = NULL;
+
+// static uint8_t to_host_buf[512];
 static int            to_host_size = 0;
 
 
@@ -88,9 +90,9 @@ void usb_control_vendor_request(const USBGenericRequest *request) {
     case USBGenericRequest_IN:  // e.g. 0xC0
         switch(command) {
         case CMD_C_APDU:
-            if (to_host_buf) {
-                USBD_Write(0, to_host_buf-4, to_host_size+4, write_cb, 0);
-                to_host_buf = NULL;
+            if (to_host_msg) {
+                USBD_Write(0, to_host_msg-4, to_host_size+4, write_cb, 0);
+                to_host_msg = NULL;
                 to_host_size = 0;
             }
             else {
@@ -108,8 +110,8 @@ void usb_control_vendor_request(const USBGenericRequest *request) {
 }
 
 void usb_control_c_apdu(const uint8_t *buf, int size) {
-    // Set size first; buf != NULL is the trigger condition.
+    // Set size first; to_host_msg != NULL is the trigger condition.
     to_host_size = size;
-    to_host_buf  = buf;
+    to_host_msg  = buf;
 }
 
