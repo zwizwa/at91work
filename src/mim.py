@@ -92,8 +92,9 @@ def c_apdu():
     msg = []
     while (not len(msg)):
         msg = usb_ctrl_IN(CMD_C_APDU)
-    log("C-APDU:%s\n" % bytes2hex(msg))
-    return msg
+    data = msg[4:]
+    log("C-APDU:%s\n" % bytes2hex(data))
+    return data
 
 def r_apdu(msg):
     log("R-APDU:%s\n" % bytes2hex(msg))

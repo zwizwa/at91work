@@ -89,7 +89,7 @@ void usb_control_vendor_request(const USBGenericRequest *request) {
         switch(command) {
         case CMD_C_APDU:
             if (to_host_buf) {
-                USBD_Write(0, to_host_buf, to_host_size, write_cb, 0);
+                USBD_Write(0, to_host_buf-4, to_host_size+4, write_cb, 0);
                 to_host_buf = NULL;
                 to_host_size = 0;
             }
