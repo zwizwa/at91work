@@ -30,14 +30,14 @@ void iso7816_slave_tick(struct iso7816_slave *s);
 // Send a-synchronous command to state machine.
 
 // IN: host->simtrace command, recorded in control request
-enum iso7816_slave_cr {
-    CR_SET_ATR = 0,
-    CR_SET_SKIP = 1,
-    CR_HALT = 2,
-    CR_POLL = 3,
-    CR_R_APDU = 4,
+enum iso7816_slave_cmd {
+    CMD_SET_ATR = 0,
+    CMD_SET_SKIP = 1,
+    CMD_HALT = 2,
+    CMD_POLL = 3,
+    CMD_R_APDU = 4,
 };
-// OUT: simtrace->host, recorded in simtrace_hdr as a reply to CR_POLL
+// OUT: simtrace->host, recorded in simtrace_hdr as a reply to CMD_POLL
 enum iso7816_slave_evt {
     // compatible with simtrace_usb_msgt
     //EVT_NULL = 0,
@@ -54,7 +54,7 @@ struct simtrace_hdr {
 
 
 int iso7816_slave_command(struct iso7816_slave *s,
-                          enum iso7816_slave_cr control_request,
+                          enum iso7816_slave_cmd command,
                           const uint8_t *buf, int size);
 
 

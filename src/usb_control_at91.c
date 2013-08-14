@@ -19,9 +19,7 @@
 
 static struct iso7816_slave *iso7816_slave;
 
-enum iso7816_slave_cr command;  // pc -> simtrace command (control request)
-
-static volatile void *from_host_msg = NULL;
+enum iso7816_slave_cmd command;  // pc -> simtrace command (control request)
 
 static uint8_t from_host_buf[512];
 static int     from_host_size = 0;
@@ -43,15 +41,8 @@ static void read_cb(void *arg,
         TRACE_ERROR( "UsbDataReceived: Transfer error\n\r");
         return;
     }
-    if (from_host_msg) {
-        TRACE_ERROR( "Previous host message not polled\n\r" );
-    }
-
     iso7816_slave_command(iso7816_slave, command,
                           from_host_buf, from_host_size);
-
-
-    from_host_msg = from_host_buf;
     USBD_Write(0,0,0,0,0); // STATUS
 }
 
@@ -94,7 +85,7 @@ void usb_control_vendor_request(const USBGenericRequest *request) {
 
     case USBGenericRequest_IN:  // e.g. 0xC0
         switch(command) {
-        case CR_POLL:
+        case CMD_POLL:
             if (to_host_msg) {
                 USBD_Write(0, to_host_msg, to_host_size, write_cb, 0);
                 to_host_msg = NULL;
@@ -134,12 +125,4 @@ void usb_control_poll(void) {
     // Poll I/O state machine.
     iso7816_slave_tick(iso7816_slave);
 
-    // Poll host commands
-#if 0
-    if (from_host_msg) {
-        iso7816_slave_command(iso7816_slave, command,
-                              from_host_buf, from_host_size);
-        from_host_msg = NULL;
-    }
-#endif
 }
