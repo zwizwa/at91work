@@ -82,23 +82,32 @@ def usb_ctrl_IN(req):
                          timeout=500)
 
 # SIMtrace slave commands, see iso7816_slave.h 
-CMD_SET_ATR  = 0
-CMD_SET_SKIP = 1
-CMD_HALT     = 2
-CMD_C_APDU   = 3
-CMD_R_APDU   = 4
+CR_SET_ATR  = 0
+CR_SET_SKIP = 1
+CR_HALT     = 2
+CR_POLL     = 3
+CR_R_APDU   = 4
+
+EVT_C_APDU  = 4
+
 
 def c_apdu():
     msg = []
     while (not len(msg)):
-        msg = usb_ctrl_IN(CMD_C_APDU)
-    data = msg[4:]
-    log("C-APDU:%s\n" % bytes2hex(data))
-    return data
+        msg = usb_ctrl_IN(CR_POLL)
+    evt = msg[0]
+    if (evt == EVT_C_APDU):
+        data = msg[4:]
+        log("C-APDU:%s\n" % bytes2hex(data))
+        return data
+
+    # Handle other events
+    log("unknown reply: %s\n" % bytes2hex(msg))
+    return c_apdu()
 
 def r_apdu(msg):
     log("R-APDU:%s\n" % bytes2hex(msg))
-    usb_ctrl_OUT(CMD_R_APDU, msg)
+    usb_ctrl_OUT(CR_R_APDU, msg)
 
 def command(tag, payload=[]):  # dummy byte
     log("CMD %d %s\n" % (tag, bytes2hex(payload)))
@@ -194,9 +203,9 @@ def mainloop():
     while 1:
         tick()
 
-command(CMD_SET_ATR, c.getATR())
-command(CMD_SET_SKIP, u32(2))
-command(CMD_HALT)
+command(CR_SET_ATR, c.getATR())
+command(CR_SET_SKIP, u32(2))
+command(CR_HALT)
 
 # reboot android phone
 def reboot():

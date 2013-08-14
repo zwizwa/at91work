@@ -39,7 +39,12 @@ enum iso7816_slave_cr {
 };
 // OUT: simtrace->host, recorded in simtrace_hdr as a reply to CR_POLL
 enum iso7816_slave_evt {
-    EVT_C_APDU = 0,
+    // compatible with simtrace_usb_msgt
+    //EVT_NULL = 0,
+    //EVT_DATA = 1,
+    //EVT_RESET = 2,
+    //EVT_STATS = 3,
+    EVT_C_APDU = 4,
 };
 struct simtrace_hdr {
     uint8_t evt;
