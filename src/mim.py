@@ -7,8 +7,8 @@
 #   socat /dev/ttyACM0 EXEC:./mim.py
 # 
 
-force_SIM = True
-# force_SIM = False
+# force_SIM = True
+force_SIM = False
 
 
 import sys
@@ -81,15 +81,15 @@ def usb_ctrl_IN(req):
                          buffer=512,
                          timeout=500)
 
-# SIMtrace slave commands, see iso7816_slave.h 
+# SIMtrace slave commands and events, see iso7816_slave.h 
 CMD_SET_ATR  = 0
 CMD_SET_SKIP = 1
 CMD_HALT     = 2
 CMD_POLL     = 3
 CMD_R_APDU   = 4
 
-EVT_RESET   = 2
-EVT_C_APDU  = 4
+EVT_RESET    = 2
+EVT_C_APDU   = 4
 
 
 def c_apdu():
@@ -189,6 +189,9 @@ def apdu(msg, delegate = default_delegate):
         # Make phone poll for command
         # return pack(data,0x91,0x20)
         return pack(data,sw1,sw2)
+
+#    if (msg[1] == 0x2C): # UNBLOCK_PIN
+#        return [0x90, 0x00]
 
     # Delegate to MIM.
     return delegate( msg )

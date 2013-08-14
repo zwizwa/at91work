@@ -233,6 +233,7 @@ static void next_io(struct iso7816_slave *s, int rv) {
     case -EAGAIN:
         break;
     case ENOERR:
+        // printf(".");
         s->io_ptr++;
         if (s->io_ptr >= s->io_endx) {
             s->state = s->io_next;
@@ -328,7 +329,7 @@ void iso7816_slave_tick(struct iso7816_slave *s) {
     int rst, vcc;
     iso7816_port_get_rst_vcc(s->port, &rst, &vcc);
 
-
+    /* Handle poweroff */
     if (!vcc && (s->state != S_OFF)) {
         TRACE_WARNING("->S_OFF\n\r");
         s->state = S_OFF;
