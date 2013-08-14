@@ -30,7 +30,7 @@ enum iso7816_slave_evt {
     // compatible with simtrace_usb_msgt
     //EVT_NULL = 0,
     //EVT_DATA = 1,
-    //EVT_RESET = 2,
+    EVT_RESET = 2,
     //EVT_STATS = 3,
     EVT_C_APDU = 4,
 };

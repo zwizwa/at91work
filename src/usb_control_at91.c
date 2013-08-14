@@ -115,7 +115,8 @@ static void send_evt(void *dummy, enum iso7816_slave_evt evt,
     struct simtrace_hdr hdr = {.evt = evt };
 
     memcpy(to_host_buf, &hdr, sizeof(hdr));
-    memcpy(to_host_buf + sizeof(hdr), buf, size);
+    if (!buf) size = 0;
+    if (size) memcpy(to_host_buf + sizeof(hdr), buf, size);
 
     to_host_size = sizeof(hdr) + size;
     to_host_msg  = to_host_buf;  // set trigger var last

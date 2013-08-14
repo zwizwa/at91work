@@ -102,7 +102,7 @@ def c_apdu():
         return data
 
     # Handle other events
-    log("unknown reply: %s\n" % bytes2hex(msg))
+    log("unknown event: %s\n" % bytes2hex(msg))
     return c_apdu()
 
 def r_apdu(msg):
