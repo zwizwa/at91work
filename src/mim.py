@@ -7,8 +7,8 @@
 #   socat /dev/ttyACM0 EXEC:./mim.py
 # 
 
-# force_SIM = True
-force_SIM = False
+force_SIM = True
+# force_SIM = False
 
 
 import sys

@@ -27,6 +27,9 @@ static int     from_host_size;
 static const uint8_t *to_host_buf  = NULL;
 static int            to_host_size = 0;
 
+
+/* Callbacks run as part of ISR! */
+
 static void read_cb(void *arg,
                     unsigned char status,
                     unsigned int transferred,

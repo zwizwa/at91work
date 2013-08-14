@@ -263,8 +263,10 @@ int main()
     // Driver loop
     while (1) {
 
-        // Poll I/O state machine.  FIXME: disable interrupts as there
-        // is contention with USB callbacks.
+        // Poll I/O state machine.
+        /* FIXME: Make sure there are no race conditions for data
+           accessed in ISR, i.e. USB read/write callbacks.  This code
+           cannot run with interrupts disabled. */
         iso7816_slave_tick(iso7816_slave);
 
         // Device is not configured
