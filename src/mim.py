@@ -88,22 +88,29 @@ CMD_HALT     = 2
 CMD_POLL     = 3
 CMD_R_APDU   = 4
 
+EVT_RESET   = 2
 EVT_C_APDU  = 4
 
 
 def c_apdu():
-    msg = []
-    while (not len(msg)):
-        msg = usb_ctrl_IN(CMD_POLL)
-    evt = msg[0]
-    if (evt == EVT_C_APDU):
-        data = msg[4:]
-        log("C-APDU:%s\n" % bytes2hex(data))
-        return data
+    while True:
+        msg = []
+        while (not len(msg)):
+            msg = usb_ctrl_IN(CMD_POLL)
+        evt = msg[0]
 
-    # Handle other events
-    log("unknown event: %s\n" % bytes2hex(msg))
-    return c_apdu()
+        if (evt == EVT_C_APDU):
+            data = msg[4:]
+            log("C-APDU:%s\n" % bytes2hex(data))
+            return data
+
+        if (evt == EVT_RESET):
+            log("RESET CARD\n")
+            global c
+            c.disconnect()
+            c = card_connect()
+        else:
+            log("unknown event: %s\n" % bytes2hex(msg))
 
 def r_apdu(msg):
     log("R-APDU:%s\n" % bytes2hex(msg))
@@ -117,11 +124,14 @@ def command(tag, payload=[]):  # dummy byte
 
 
 # connect to card
-r = readers()
-# print r # => ['SCM Microsystems Inc. SCR 331 [CCID Interface] (21121250210402) 00 00']
-c = r[0].createConnection()
-c.connect()
+def card_connect():
+    r = readers()
+    # print r # => ['SCM Microsystems Inc. SCR 331 [CCID Interface] (21121250210402) 00 00']
+    c = r[0].createConnection()
+    c.connect()
+    return c
 
+c = card_connect()
 
 
 
