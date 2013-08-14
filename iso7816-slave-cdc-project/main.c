@@ -47,7 +47,8 @@
 #include <pmc/pmc.h>
 #include <string.h>
 #include "hexin.h"
-#include "iso7816_slave.h"
+
+#include "usb_control_at91.h"
 
 
 //------------------------------------------------------------------------------
@@ -182,7 +183,6 @@ void USBDCallbacks_Suspended(void)
 
 static uint8_t hexin_buf[512];
 static struct hexin h = {.buf = hexin_buf};
-struct iso7816_slave *iso7816_slave;
 
 static char hexout_buf[DATABUFFERSIZE];
 
@@ -225,11 +225,6 @@ static void UsbDataSent(void *pArg,
 }
 #endif
 
-void usb_control_c_apdu(const uint8_t *buf, int size);
-static void c_apdu_cb(void *ctx, const uint8_t *buf, int size) {
-    usb_control_c_apdu(buf, size); // control requests
-}
-
 
 
 
@@ -257,17 +252,14 @@ int main()
     // connect if needed
     VBUS_CONFIGURE();
 
-    /* Init phone ISO7816 USART */
-    iso7816_slave = iso7816_slave_init(c_apdu_cb, NULL);
+    // gadget init
+    usb_control_init();
 
     // Driver loop
     while (1) {
 
-        // Poll I/O state machine.
-        /* FIXME: Make sure there are no race conditions for data
-           accessed in ISR, i.e. USB read/write callbacks.  This code
-           cannot run with interrupts disabled. */
-        iso7816_slave_tick(iso7816_slave);
+        // gadget poll
+        usb_control_poll();
 
         // Device is not configured
         if (USBD_GetState() < USBD_STATE_CONFIGURED) {

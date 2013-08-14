@@ -4,7 +4,8 @@
 #include <stdint.h>
 #include <usb/common/core/USBGenericRequest.h>
 
-void usb_control_c_apdu(const uint8_t *buf, int size);
+void usb_control_init(void);
+void usb_control_poll(void);
 void usb_control_vendor_request(const USBGenericRequest *request);
 
 #endif

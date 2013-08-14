@@ -17,13 +17,14 @@
    }
 */
 
-
-extern struct iso7816_slave *iso7816_slave;  // main.c
+static struct iso7816_slave *iso7816_slave;
 
 enum iso7816_slave_cr command;  // pc -> simtrace command (control request)
 
+static volatile void *from_host_msg = NULL;
+
 static uint8_t from_host_buf[512];
-static int     from_host_size;
+static int     from_host_size = 0;
 
 static const uint8_t *to_host_msg  = NULL;
 
@@ -42,15 +43,16 @@ static void read_cb(void *arg,
         TRACE_ERROR( "UsbDataReceived: Transfer error\n\r");
         return;
     }
-    // FIXME: Is it ok to call this from ISR?
-    // Probably not... add indirection.
-    if (!iso7816_slave_command(iso7816_slave, command,
-                               from_host_buf, from_host_size)) {
-        USBD_Write(0,0,0,0,0); // STATUS
+    if (from_host_msg) {
+        TRACE_ERROR( "Previous host message not polled\n\r" );
     }
-    else {
-        USBD_Stall(0);
-    }
+
+    iso7816_slave_command(iso7816_slave, command,
+                          from_host_buf, from_host_size);
+
+
+    from_host_msg = from_host_buf;
+    USBD_Write(0,0,0,0,0); // STATUS
 }
 
 static void write_cb(void *arg,
@@ -112,7 +114,7 @@ void usb_control_vendor_request(const USBGenericRequest *request) {
     }
 }
 
-void usb_control_c_apdu(const uint8_t *buf, int size) {
+static void c_apdu_cb(void *dummy, const uint8_t *buf, int size) {
     struct simtrace_hdr hdr = {.evt = EVT_C_APDU };
 
     memcpy(to_host_buf, &hdr, sizeof(hdr));
@@ -122,3 +124,22 @@ void usb_control_c_apdu(const uint8_t *buf, int size) {
     to_host_msg  = to_host_buf;  // set trigger var last
 }
 
+void usb_control_init(void) {
+    /* Init phone ISO7816 USART */
+    iso7816_slave = iso7816_slave_init(c_apdu_cb, NULL);
+}
+
+void usb_control_poll(void) {
+
+    // Poll I/O state machine.
+    iso7816_slave_tick(iso7816_slave);
+
+    // Poll host commands
+#if 0
+    if (from_host_msg) {
+        iso7816_slave_command(iso7816_slave, command,
+                              from_host_buf, from_host_size);
+        from_host_msg = NULL;
+    }
+#endif
+}
