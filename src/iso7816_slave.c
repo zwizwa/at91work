@@ -133,9 +133,9 @@ enum iso7816_state {
 
 struct iso7816_slave {
     struct iso7816_port *port;
-    iso7816_slave_c_apdu_t c_apdu_cb;
-    void *c_apdu_ctx;
-    enum iso7816_state state;
+    iso7816_slave_send_event send;
+    void *send_ctx;
+    volatile enum iso7816_state state;
     enum iso7816_state io_next; // next state after I/O is done
     uint8_t *io_ptr;            // current read(RX) or write(TX) index
     uint8_t *io_endx;           // current(TX) or expected(RX) size of message
@@ -473,7 +473,7 @@ void iso7816_slave_tick(struct iso7816_slave *s) {
         TRACE_DEBUG("S_TPDU_DATA\n\r");
         s->state = S_TPDU_WAIT_REPLY;
         s->io_ptr = s->msg.buf; // FIXME: not necessary after remove of getc method
-        s->c_apdu_cb(s->c_apdu_ctx, s->msg.buf, s->c_apdu_size);
+        s->send(s->send_ctx, EVT_C_APDU, s->msg.buf, s->c_apdu_size);
         break;
     case S_TPDU_WAIT_REPLY:
         /* Wait for data provided by is7816_slave_r_apdu() */
@@ -511,11 +511,11 @@ void iso7816_slave_tick(struct iso7816_slave *s) {
 
 static struct iso7816_slave phone;
 
-struct iso7816_slave *iso7816_slave_init(iso7816_slave_c_apdu_t c_apdu_cb, void *c_apdu_ctx) {
+struct iso7816_slave *iso7816_slave_init(iso7816_slave_send_event send, void *send_ctx) {
     struct iso7816_slave *s = &phone;
     bzero(s, sizeof(*s));
-    s->c_apdu_cb  = c_apdu_cb;
-    s->c_apdu_ctx = c_apdu_ctx;
+    s->send = send;
+    s->send_ctx = send_ctx;
     s->port = iso7816_port_init(1);
     s->state = S_HALT;
 

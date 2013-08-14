@@ -105,8 +105,14 @@ void usb_control_vendor_request(const USBGenericRequest *request) {
     }
 }
 
-static void c_apdu_cb(void *dummy, const uint8_t *buf, int size) {
-    struct simtrace_hdr hdr = {.evt = EVT_C_APDU };
+static void send_evt(void *dummy, enum iso7816_slave_evt evt,
+                     const uint8_t *buf, int size) {
+
+    if (to_host_msg) {
+        TRACE_ERROR("send_evt: already in progress\n\r");
+    }
+
+    struct simtrace_hdr hdr = {.evt = evt };
 
     memcpy(to_host_buf, &hdr, sizeof(hdr));
     memcpy(to_host_buf + sizeof(hdr), buf, size);
@@ -117,7 +123,7 @@ static void c_apdu_cb(void *dummy, const uint8_t *buf, int size) {
 
 void usb_control_init(void) {
     /* Init phone ISO7816 USART */
-    iso7816_slave = iso7816_slave_init(c_apdu_cb, NULL);
+    iso7816_slave = iso7816_slave_init(send_evt, NULL);
 }
 
 void usb_control_poll(void) {

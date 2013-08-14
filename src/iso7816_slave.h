@@ -15,18 +15,6 @@
 
 struct iso7816_slave;
 
-// Callback to initiate C-APDU packet transfer.
-typedef void (*iso7816_slave_c_apdu_t)(void *ctx, const uint8_t *buf, int size);
-
-// Send R-APDU to serial port.
-int iso7816_slave_r_apdu_write(struct iso7816_slave *s, const uint8_t *buf, int size);
-
-struct iso7816_slave *iso7816_slave_init(iso7816_slave_c_apdu_t c_apdu_cb, void *c_apdu_ctx);
-
-// State machine transition routine.  This should be called in the
-// application's event loop.
-void iso7816_slave_tick(struct iso7816_slave *s);
-
 // Send a-synchronous command to state machine.
 
 // IN: host->simtrace command, recorded in control request
@@ -51,6 +39,20 @@ struct simtrace_hdr {
     uint8_t flags;
     uint8_t res[2];
 } __attribute__((packed));
+
+
+// Callback to initiate C-APDU packet transfer.
+typedef void (*iso7816_slave_send_event)(void *ctx, enum iso7816_slave_evt event,
+                                         const uint8_t *buf, int size);
+
+// Send R-APDU to serial port.
+int iso7816_slave_r_apdu_write(struct iso7816_slave *s, const uint8_t *buf, int size);
+
+struct iso7816_slave *iso7816_slave_init(iso7816_slave_send_event send, void *send_ctx);
+
+// State machine transition routine.  This should be called in the
+// application's event loop.
+void iso7816_slave_tick(struct iso7816_slave *s);
 
 
 int iso7816_slave_command(struct iso7816_slave *s,
