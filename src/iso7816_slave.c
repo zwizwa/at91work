@@ -275,10 +275,10 @@ int iso7816_slave_r_apdu_write(struct iso7816_slave *s, const uint8_t *buf, int 
 
 // Send a-synchronous command to state machine.
 int iso7816_slave_command(struct iso7816_slave *s,
-                          enum iso7816_slave_command_tag cmd,
+                          enum iso7816_slave_cr control_request,
                           const uint8_t *buf, int buf_size) {
-    switch(cmd) {
-    case CMD_SET_ATR:
+    switch(control_request) {
+    case CR_SET_ATR:
         TRACE_WARNING("CMD_SET_ATR\n\r");
         if (buf_size > sizeof(s->atr)) {
             TRACE_ERROR("ATR too large! %d > %d\n\r", buf_size, sizeof(s->atr));
@@ -288,7 +288,7 @@ int iso7816_slave_command(struct iso7816_slave *s,
             s->atr_size = buf_size;
         }
         break;
-    case CMD_SET_SKIP:
+    case CR_SET_SKIP:
         if (buf_size < sizeof(s->skip_power)) {
             TRACE_ERROR("CMD_SET_SKIP data size incorrect: %d\n\r", buf_size);
         }
@@ -297,20 +297,21 @@ int iso7816_slave_command(struct iso7816_slave *s,
             TRACE_WARNING("CMD_SET_SKIP %d\n\r", s->skip_power);
         }
         break;
-    case CMD_HALT:
+    case CR_HALT:
         TRACE_WARNING("CMD_HALT\n\r");
         s->state = S_HALT;
         break;
-    case CMD_R_APDU:
+    case CR_R_APDU:
         TRACE_DEBUG("CMD_R_APDU %02x%02x\n\r",
                     buf[buf_size-2],
                     buf[buf_size-1]);
         iso7816_slave_r_apdu_write(s, buf, buf_size);
         break;
-    // IN commands, not handled here:
-    // caseCMD_C_APDU:
+
+    case CR_POLL: // IN request, not handled here
     default:
-        TRACE_ERROR("Invalid command %d, %d bytes\n\r", cmd, buf_size);
+        TRACE_ERROR("Invalid OUT request %d, %d bytes\n\r",
+                    control_request, buf_size);
         return -EIO;
         break;
     }

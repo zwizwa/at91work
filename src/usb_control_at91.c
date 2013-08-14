@@ -17,16 +17,17 @@
    }
 */
 
+
 extern struct iso7816_slave *iso7816_slave;  // main.c
 
-enum iso7816_slave_command_tag command;
+enum iso7816_slave_cr command;  // pc -> simtrace command (control request)
 
 static uint8_t from_host_buf[512];
 static int     from_host_size;
 
 static const uint8_t *to_host_msg  = NULL;
 
-// static uint8_t to_host_buf[512];
+static uint8_t        to_host_buf[512];
 static int            to_host_size = 0;
 
 
@@ -41,6 +42,8 @@ static void read_cb(void *arg,
         TRACE_ERROR( "UsbDataReceived: Transfer error\n\r");
         return;
     }
+    // FIXME: Is it ok to call this from ISR?
+    // Probably not... add indirection.
     if (!iso7816_slave_command(iso7816_slave, command,
                                from_host_buf, from_host_size)) {
         USBD_Write(0,0,0,0,0); // STATUS
@@ -89,9 +92,9 @@ void usb_control_vendor_request(const USBGenericRequest *request) {
 
     case USBGenericRequest_IN:  // e.g. 0xC0
         switch(command) {
-        case CMD_C_APDU:
+        case CR_POLL:
             if (to_host_msg) {
-                USBD_Write(0, to_host_msg-4, to_host_size+4, write_cb, 0);
+                USBD_Write(0, to_host_msg, to_host_size, write_cb, 0);
                 to_host_msg = NULL;
                 to_host_size = 0;
             }
@@ -110,8 +113,12 @@ void usb_control_vendor_request(const USBGenericRequest *request) {
 }
 
 void usb_control_c_apdu(const uint8_t *buf, int size) {
-    // Set size first; to_host_msg != NULL is the trigger condition.
-    to_host_size = size;
-    to_host_msg  = buf;
+    struct simtrace_hdr hdr = {.evt = EVT_C_APDU };
+
+    memcpy(to_host_buf, &hdr, sizeof(hdr));
+    memcpy(to_host_buf + sizeof(hdr), buf, size);
+
+    to_host_size = sizeof(hdr) + size;
+    to_host_msg  = to_host_buf;  // set trigger var last
 }
 

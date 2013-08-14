@@ -28,16 +28,28 @@ struct iso7816_slave *iso7816_slave_init(iso7816_slave_c_apdu_t c_apdu_cb, void 
 void iso7816_slave_tick(struct iso7816_slave *s);
 
 // Send a-synchronous command to state machine.
-enum iso7816_slave_command_tag {
-    CMD_SET_ATR = 0,
-    CMD_SET_SKIP = 1,
-    CMD_HALT = 2,
-    CMD_C_APDU = 3,
-    CMD_R_APDU = 4,
+
+// IN: host->simtrace command, recorded in control request
+enum iso7816_slave_cr {
+    CR_SET_ATR = 0,
+    CR_SET_SKIP = 1,
+    CR_HALT = 2,
+    CR_POLL = 3,
+    CR_R_APDU = 4,
 };
+// OUT: simtrace->host, recorded in simtrace_hdr as a reply to CR_POLL
+enum iso7816_slave_evt {
+    EVT_C_APDU = 0,
+};
+struct simtrace_hdr {
+    uint8_t evt;
+    uint8_t flags;
+    uint8_t res[2];
+} __attribute__((packed));
+
 
 int iso7816_slave_command(struct iso7816_slave *s,
-                          enum iso7816_slave_command_tag cmd,
+                          enum iso7816_slave_cr control_request,
                           const uint8_t *buf, int size);
 
 
