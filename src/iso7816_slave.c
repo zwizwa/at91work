@@ -463,8 +463,8 @@ void iso7816_slave_tick(struct iso7816_slave *s) {
             s->c_apdu_size = sizeof(struct tpdu) + size;
             s->r_apdu_size = 2;
         }
-        /* Send protocol byte. */
-        next_send(s, S_TPDU_PROT, &s->msg.tpdu.ins, 1);
+        /* Send protocol byte if there is data to transfer. */
+        next_send(s, S_TPDU_PROT, &s->msg.tpdu.ins, size ? 1 : 0);
         break;
     case S_TPDU_PROT: {
         // FIXME: add timeout for all receive ops except the initial TPDU header.
