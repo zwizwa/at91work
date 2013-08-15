@@ -432,11 +432,8 @@ void iso7816_slave_tick(struct iso7816_slave *s) {
                       s->msg.tpdu.p1,
                       s->msg.tpdu.p2,
                       s->msg.tpdu.p3);
-        next_send(s, S_TPDU_PROT, &s->msg.tpdu.ins, 1);
-        break;
-    case S_TPDU_PROT: {
-        /* Protocol byte is out.
-           P3 contains data size, INS determines direction.
+
+        /* P3 contains data size, INS determines direction.
 
            FIXME: INS->direction + size mapping is done by trial and
                   error on real phone/SIM combos.  Go over specs for
@@ -449,6 +446,7 @@ void iso7816_slave_tick(struct iso7816_slave *s) {
         switch(s->msg.tpdu.ins) {
         case INS_STATUS:
         case INS_UNBLOCK_PIN:
+        case INS_VERIFY:
             // .. except here P3==0x00 is 0 bytes payload.
             size = s->msg.tpdu.p3;
         case INS_READ_BINARY:
@@ -460,16 +458,20 @@ void iso7816_slave_tick(struct iso7816_slave *s) {
             s->r_apdu_size = size + 2;
             break;
         default:
+            // if (s->msg.tpdu.ins == INS_UNBLOCK_PIN) size = 1;
             /* data in C-APDU */
             s->c_apdu_size = sizeof(struct tpdu) + size;
             s->r_apdu_size = 2;
         }
+        /* Send protocol byte. */
+        next_send(s, S_TPDU_PROT, &s->msg.tpdu.ins, 1);
+        break;
+    case S_TPDU_PROT: {
         // FIXME: add timeout for all receive ops except the initial TPDU header.
         next_receive(s, S_TPDU_DATA, &s->msg.tpdu.data[0],
                      s->c_apdu_size - sizeof(struct tpdu));
         break;
     }
-
     case S_TPDU_DATA:
         /* All C-APDU data is in.  Pass it to handler. */
         TRACE_DEBUG("S_TPDU_DATA\n\r");

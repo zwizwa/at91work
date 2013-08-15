@@ -49,6 +49,8 @@ TRACE_LEVEL = 3
 
 # Optimization level, put in comment for debugging
 # OPTIMIZATION = -Os
+
+# FIXME: probably some "volatile" problems since -Os gives different behavior
 OPTIMIZATION = -O0 -Wno-format -Werror -Wno-unused-variable
 
 # AT91 library directory

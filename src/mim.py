@@ -8,6 +8,7 @@
 # 
 
 # force_SIM = True
+
 force_SIM = False
 
 
@@ -18,6 +19,7 @@ from smartcard.util import toHexString
 import subprocess
 import struct
 import socket
+import time
 
 log = sys.stderr.write
 
@@ -101,7 +103,6 @@ def c_apdu():
 
         if (evt == EVT_C_APDU):
             data = msg[4:]
-            log("C-APDU:%s\n" % bytes2hex(data))
             return data
 
         if (evt == EVT_RESET):
@@ -113,7 +114,6 @@ def c_apdu():
             log("unknown event: %s\n" % bytes2hex(msg))
 
 def r_apdu(msg):
-    log("R-APDU:%s\n" % bytes2hex(msg))
     usb_ctrl_OUT(CMD_R_APDU, msg)
 
 def command(tag, payload=[]):  # dummy byte
@@ -177,7 +177,6 @@ def default_delegate(msg):
 
 # Perform APDU request on card
 def apdu(msg, delegate = default_delegate):
-    pretty_apdu( msg )
 
     # Force SIM protocol for USIM cards.
     if (force_SIM):
@@ -190,8 +189,9 @@ def apdu(msg, delegate = default_delegate):
         # return pack(data,0x91,0x20)
         return pack(data,sw1,sw2)
 
-#    if (msg[1] == 0x2C): # UNBLOCK_PIN
-#        return [0x90, 0x00]
+    #if (msg[1] == 0x2C): # UNBLOCK_PIN
+    #    #time.sleep(1)
+    #    return [0x63, 0xCA]
 
     # Delegate to MIM.
     return delegate( msg )
@@ -211,13 +211,17 @@ def tick():
     r = apdu(c)
     r_apdu(r)
     gsmtap(c,r)
+    log("C-APDU:%s\n" % bytes2hex(c))
+    pretty_apdu(c)
+    log("R-APDU:%s\n" % bytes2hex(r))
+
 
 def mainloop():
     while 1:
         tick()
 
 command(CMD_SET_ATR, c.getATR())
-command(CMD_SET_SKIP, u32(2))
+command(CMD_SET_SKIP, u32(1))
 command(CMD_HALT)
 
 # reboot android phone
