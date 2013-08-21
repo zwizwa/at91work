@@ -266,7 +266,7 @@ int iso7816_slave_r_apdu_write(struct iso7816_slave *s, const uint8_t *buf, int 
     memcpy(s->msg.buf + s->c_apdu_size, buf, size);
     if (size != s->r_apdu_size) {
         TRACE_WARNING("R-APDU data size incorrect size:%d != r_apdu_size:%d\n",
-                    size, s->r_apdu_size);
+                      size, s->r_apdu_size);
         s->r_apdu_size = size;
         iso7816_slave_print_apdu(s);
     }
@@ -275,6 +275,26 @@ int iso7816_slave_r_apdu_write(struct iso7816_slave *s, const uint8_t *buf, int 
 }
 
 // Send a-synchronous command to state machine.
+
+/* This routine runs from an ISR callback.  I don't see a good way
+   around this at this point.  For now race conditions need to be
+   checked between this and iso7816_slave_tick()
+
+   - write r_apdu: not a problem, since _tick() is in a wait state.
+
+   - set s->skip_power: OK because read-only in _tick()
+
+
+   The other updates are a-synchronous.
+
+   - ATR: possible race condition, but unlikely.
+     It is assumed phone will just retry if an invalid ATR is seen
+
+   - set s->state: likely race condition if _tick() is about to write,
+     unlikely if we're in a wait state.
+
+ */
+
 int iso7816_slave_command(struct iso7816_slave *s,
                           enum iso7816_slave_cmd command,
                           const uint8_t *buf, int buf_size) {
@@ -424,8 +444,9 @@ void iso7816_slave_tick(struct iso7816_slave *s) {
 
         /**** MAIN LOOP ****/
 
-    case S_TPDU:
-        /* TPDU header is in, send protocol byte. */
+    case S_TPDU: {
+        /* TPDU header is in.
+           Interpret and possibly send protocol byte. */
         TRACE_WARNING("%02X%02X%02X%02X%02X\n\r",
                       s->msg.tpdu.cla,
                       s->msg.tpdu.ins,
@@ -433,17 +454,22 @@ void iso7816_slave_tick(struct iso7816_slave *s) {
                       s->msg.tpdu.p2,
                       s->msg.tpdu.p3);
 
-        /* P3 contains data size, INS determines direction.
+        /* P3  contains data size encoding
+           INS determines data direction and interpretation of P3.
+           ( how *NOT* to design a transport protocol ;)
 
-           FIXME: INS->direction + size mapping is done by trial and
-                  error on real phone/SIM combos.  Go over specs for
-                  exhaustive list. */
+           FIXME: Mapping is done by trial and error.
+                  Some might be missing.
+                  Check ETSI TS 102 221 */
 
-        //TRACE_DEBUG("S_TPDU_PROT\n\r");  // debug introduces too much delay
+        //TRACE_DEBUG("S_TPDU_PROT\n\r"); // debug introduces too much delay
 
         // By default, P3==0x00 is 256 bytes payload...
         int size = (s->msg.tpdu.p3 != 0) ? s->msg.tpdu.p3 : 0x100;
+
         switch(s->msg.tpdu.ins) {
+
+            /* GENERAL CASE */
         case INS_STATUS:
         case INS_UNBLOCK_PIN:
         case INS_VERIFY:
@@ -466,6 +492,7 @@ void iso7816_slave_tick(struct iso7816_slave *s) {
         /* Send protocol byte if there is data to transfer. */
         next_send(s, S_TPDU_PROT, &s->msg.tpdu.ins, size ? 1 : 0);
         break;
+    }
     case S_TPDU_PROT: {
         // FIXME: add timeout for all receive ops except the initial TPDU header.
         next_receive(s, S_TPDU_DATA, &s->msg.tpdu.data[0],
@@ -476,7 +503,6 @@ void iso7816_slave_tick(struct iso7816_slave *s) {
         /* All C-APDU data is in.  Pass it to handler. */
         TRACE_DEBUG("S_TPDU_DATA\n\r");
         s->state = S_TPDU_WAIT_REPLY;
-        s->io_ptr = s->msg.buf; // FIXME: not necessary after remove of getc method
         s->send_event(s->send_event_ctx, EVT_C_APDU, s->msg.buf, s->c_apdu_size);
         break;
     case S_TPDU_WAIT_REPLY:
