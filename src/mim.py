@@ -18,8 +18,9 @@ from smartcard.System import readers
 from smartcard.util import toHexString
 import subprocess
 import struct
-import socket
 import time
+
+import gsmtap
 
 log = sys.stderr.write
 
@@ -33,26 +34,6 @@ def bytes2str(bytes):
 def hex2bytes(hex):
     return map(ord,hex.decode("hex"))
 
-
-
-# log APDUs to gsmtap
-gsmtap_hdr = [2, # GSMTAP_VERSION,
-              4, # nb of u32 in header
-              4, # GSMTAP_TYPE_SIM,
-              0,0,0,0,0,0,0,0,0,0,0,0,0]
-
-# gsmtap_addr = ("127.0.0.1", 4729)
-gsmtap_addr = ("<broadcast>", 4729)
-gsmtap_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-gsmtap_sock.bind(('127.0.0.1', 0))
-# broadcast avoids ICMP port unreachable
-gsmtap_sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
-
-def gsmtap(c_apdu, r_apdu):
-    msg = list(gsmtap_hdr)
-    msg.extend(c_apdu)
-    msg.extend(r_apdu)
-    gsmtap_sock.sendto(bytes2str(msg), gsmtap_addr)
 
 
 
@@ -139,6 +120,7 @@ c = card_connect()
 
 # log("ATR = {%s}\n" % "".join(map(lambda v: "0x%02x, " % v, c.getATR())))
 
+# FIXME: remove this - use wireshark gsmtap instead.
 def pretty_apdu(msg):
   try:  
     ins = msg[1]
@@ -210,7 +192,7 @@ def tick():
     c = c_apdu()
     r = apdu(c)
     r_apdu(r)
-    gsmtap(c,r)
+    gsmtap.log(c,r)
     log("C-APDU:%s\n" % bytes2hex(c))
     pretty_apdu(c)
     log("R-APDU:%s\n" % bytes2hex(r))
