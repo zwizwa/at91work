@@ -1,7 +1,7 @@
 # SIMtrace APDU forwarder, host side.
 
 import sys
-import tag  # some SIM-related constant definitions
+import simconst
 import subprocess
 
 import gsmtap
@@ -33,17 +33,17 @@ def pretty_apdu(msg, log=sys.stderr.write):
   try:  
     ins = msg[1]
     try:
-        log(" %s" % tag.iso7816[ins])
+        log(" %s" % simconst.iso7816[ins])
     except:
         log(" %02X" % ins)
         pass
     if (msg[1] == 0xA4): # SELECT_FILE
         file = msg[5] * 256 + msg[6]
         try:
-            log(" %s" % tag.USIMConstants[file])
+            log(" %s" % simconst.USIMConstants[file])
         except:
             try:
-                log(" %s" % tag.SIMConstants[file])
+                log(" %s" % simconst.SIMConstants[file])
             except:
                 log(" %04X" % file)
                 pass
