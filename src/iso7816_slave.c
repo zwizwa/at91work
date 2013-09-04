@@ -117,7 +117,7 @@ enum iso7816_state {
 
     /* MAIN LOOP */
     S_TPDU,
-    S_TPDU_PROT,
+    S_TPDU_PROC,
     S_TPDU_DATA,
     S_TPDU_WAIT_REPLY,
     S_TPDU_REPLY,
@@ -446,7 +446,7 @@ void iso7816_slave_tick(struct iso7816_slave *s) {
 
     case S_TPDU: {
         /* TPDU header is in.
-           Interpret and possibly send protocol byte. */
+           Interpret and possibly send procedure byte. */
         TRACE_WARNING("%02X%02X%02X%02X%02X\n\r",
                       s->msg.tpdu.cla,
                       s->msg.tpdu.ins,
@@ -462,7 +462,7 @@ void iso7816_slave_tick(struct iso7816_slave *s) {
                   Some might be missing.
                   Check ETSI TS 102 221 */
 
-        //TRACE_DEBUG("S_TPDU_PROT\n\r"); // debug introduces too much delay
+        //TRACE_DEBUG("S_TPDU_PROC\n\r"); // debug introduces too much delay
 
         // By default, P3==0x00 is 256 bytes payload...
         int size = (s->msg.tpdu.p3 != 0) ? s->msg.tpdu.p3 : 0x100;
@@ -489,11 +489,19 @@ void iso7816_slave_tick(struct iso7816_slave *s) {
             s->c_apdu_size = sizeof(struct tpdu) + size;
             s->r_apdu_size = 2;
         }
-        /* Send protocol byte if there is data to transfer. */
-        next_send(s, S_TPDU_PROT, &s->msg.tpdu.ins, size ? 1 : 0);
+        if (1) {
+            // FIXME: in general, do not send procedure byte for
+            // failing commands that would return data SIM->PHONE.
+            const uint8_t status_hack[] = {0x80, 0xF2, 0x00, 0x01, 0xFF};
+            if (0 == memcmp(status_hack, &s->msg.tpdu, sizeof(status_hack))) {
+                size = 0;
+            }
+        }
+        /* Send procedure byte if there is data to transfer. */
+        next_send(s, S_TPDU_PROC, &s->msg.tpdu.ins, size ? 1 : 0);
         break;
     }
-    case S_TPDU_PROT: {
+    case S_TPDU_PROC: {
         // FIXME: add timeout for all receive ops except the initial TPDU header.
         next_receive(s, S_TPDU_DATA, &s->msg.tpdu.data[0],
                      s->c_apdu_size - sizeof(struct tpdu));
