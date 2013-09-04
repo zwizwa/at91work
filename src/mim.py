@@ -14,27 +14,15 @@ force_SIM = False
 
 import sys
 import tag  # some SIM-related constant definitions
-from smartcard.System import readers
-from smartcard.util import toHexString
+import smartcard
 import subprocess
 import struct
 import time
 
 import gsmtap
+import hextools
 
 log = sys.stderr.write
-
-
-def bytes2hex(bytes):
-    return "".join(map(lambda v: "%02X"%v, bytes))
-
-def bytes2str(bytes):
-    return struct.pack('B'*len(bytes), *bytes)
-
-def hex2bytes(hex):
-    return map(ord,hex.decode("hex"))
-
-
 
 
 # APDUs go over USB vendor control requests
@@ -92,13 +80,13 @@ def c_apdu():
             c.disconnect()
             c = card_connect()
         else:
-            log("unknown event: %s\n" % bytes2hex(msg))
+            log("unknown event: %s\n" % hextools.bytes2hex(msg))
 
 def r_apdu(msg):
     usb_ctrl_OUT(CMD_R_APDU, msg)
 
 def command(tag, payload=[]):  # dummy byte
-    log("CMD %d %s\n" % (tag, bytes2hex(payload)))
+    log("CMD %d %s\n" % (tag, hextools.bytes2hex(payload)))
     usb_ctrl_OUT(tag, payload)
 
 
@@ -106,7 +94,7 @@ def command(tag, payload=[]):  # dummy byte
 
 # connect to card
 def card_connect():
-    r = readers()
+    r = smartcard.System.readers()
     # print r # => ['SCM Microsystems Inc. SCR 331 [CCID Interface] (21121250210402) 00 00']
     c = r[0].createConnection()
     c.connect()
@@ -193,9 +181,9 @@ def tick():
     r = apdu(c)
     r_apdu(r)
     gsmtap.log(c,r)
-    log("C-APDU:%s\n" % bytes2hex(c))
+    log("C-APDU:%s\n" % hextools.bytes2hex(c))
     pretty_apdu(c)
-    log("R-APDU:%s\n" % bytes2hex(r))
+    log("R-APDU:%s\n" % hextools.bytes2hex(r))
 
 
 def mainloop():
@@ -207,8 +195,9 @@ command(CMD_SET_SKIP, u32(1))
 command(CMD_HALT)
 
 # reboot android phone
+adb = "/opt/xc/android/android-sdk-linux/platform-tools/adb"
 def reboot():
-    subprocess.call(["adb", "shell", "reboot"])
+    subprocess.call([adb, "shell", "reboot"])
 
 
 # start handling incoming phone C-APDUs

@@ -252,7 +252,7 @@ const CDCDSerialDriverConfigurationDescriptors configurationDescriptors = {
     },
     DFU_IF_DESCRIPTORS
 };
-
+int sizeof_configurationDescriptors = sizeof(configurationDescriptors);
 /// Language ID string descriptor
 const unsigned char languageIdStringDescriptor[] = {
 

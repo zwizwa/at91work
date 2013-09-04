@@ -235,12 +235,15 @@ static void UsbDataSent(void *pArg,
 //------------------------------------------------------------------------------
 /// Initializes drivers and start the USB <-> Serial bridge.
 //------------------------------------------------------------------------------
+extern int sizeof_configurationDescriptors;
 int main()
 {
     TRACE_CONFIGURE(DBGU_STANDARD, 115200, BOARD_MCK);
     printf("-- USB Device CDC Serial Project %s --\n\r", SOFTPACK_VERSION);
     printf("-- %s\n\r", BOARD_NAME);
     printf("-- Compiled: %s %s --\n\r", __DATE__, __TIME__);
+
+    printf("%d\n", sizeof_configurationDescriptors);
 
     // If they are present, configure Vbus & Wake-up pins
     PIO_InitializeInterrupts(0);
