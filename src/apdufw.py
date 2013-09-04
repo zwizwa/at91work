@@ -54,8 +54,8 @@ def pretty_apdu(msg, log=sys.stderr.write):
 
 
 class forwarder:
-    def __init__(self, handler, idVendor=0x03eb, idProduct=0x6119, log=sys.stderr.write):
-        self.handler = handler
+    def __init__(self, srv, idVendor=0x03eb, idProduct=0x6119, log=sys.stderr.write):
+        self.srv = srv
         self.log = log
         self.dev = usb_find(idVendor, idProduct)
         self.dh = self.dev.open()
@@ -87,7 +87,7 @@ class forwarder:
 
             if (evt == EVT_RESET):
                 self.log("RESET CARD\n")
-                self.handler.reset()
+                self.srv.reset()
             else:
                 self.log("unknown event: %s\n" % hextools.bytes2hex(msg))
 
@@ -102,7 +102,7 @@ class forwarder:
 
     def tick(self):
         c = self.c_apdu()
-        r = self.handler.apdu(c)
+        r = self.srv.apdu(c)
         self.r_apdu(r)
         gsmtap.log(c,r)
         self.log("C-APDU:%s\n" % hextools.bytes2hex(c))
@@ -120,7 +120,7 @@ class forwarder:
         subprocess.call([adb, "shell", "reboot"])
 
     def run(self):
-        self.command(CMD_SET_ATR, self.handler.getATR())
+        self.command(CMD_SET_ATR, self.srv.getATR())
         self.command(CMD_SET_SKIP, hextools.u32(1))
         self.command(CMD_HALT)
 
