@@ -13,3 +13,11 @@ def hex(x):
     if type(x) != str:
         x = bytes2hex(x)
     return x
+
+# see iso7816_slave.h
+# AT91 is little endian.
+def u32(val):
+    return [val & 0xFF,
+            (val >> 8) & 0xFF,
+            (val >> 16) & 0xFF,
+            (val >> 24) & 0xFF];

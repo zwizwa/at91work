@@ -23,6 +23,7 @@ import time
 
 import gsmtap
 import hextools
+import apdufw
 
 log = sys.stderr.write
 
@@ -64,111 +65,11 @@ def pack(reply,sw1,sw2):
     p.append(sw2)
     return p
 
-# FIXME: remove this - use wireshark gsmtap instead.
-def pretty_apdu(msg):
-  try:  
-    ins = msg[1]
-    try:
-        log(" %s" % tag.iso7816[ins])
-    except:
-        log(" %02X" % ins)
-        pass
-    if (msg[1] == 0xA4): # SELECT_FILE
-        file = msg[5] * 256 + msg[6]
-        try:
-            log(" %s" % tag.USIMConstants[file])
-        except:
-            try:
-                log(" %s" % tag.SIMConstants[file])
-            except:
-                log(" %04X" % file)
-                pass
-            pass
-    log("\n")
-  except:
-    pass
-
-
-class apdu_fw:
-    def __init__(self, handler, idVendor=0x03eb, idProduct=0x6119):
-        self.handler = handler
-        self.dev =  usb_find(idVendor=0x03eb, idProduct=0x6119) # CDC
-        # dev = find(idVendor=0x03eb, idProduct=0x6129)  # CCID
-        self.dh = self.dev.open()
-
-    def usb_ctrl_OUT(self, req, buf):
-        return self.dh.controlMsg(0x40,
-                                  request=req,    # R-APDU
-                                  buffer=buf,
-                                  timeout=500)
-    def usb_ctrl_IN(self, req):
-        return self.dh.controlMsg(0xC0,
-                                  request=req,
-                                  buffer=512,
-                                  timeout=500)
-    def log(self, msg):
-        sys.stderr.write(msg)
-
-    # FIXME: make this a proper event-handler loop
-    def c_apdu(self):
-        while True:
-            msg = []
-            while (not len(msg)):
-                msg = self.usb_ctrl_IN(CMD_POLL)
-
-            evt = msg[0]
-            if (evt == EVT_C_APDU):
-                data = msg[4:]
-                return data
-
-            if (evt == EVT_RESET):
-                log("RESET CARD\n")
-                self.handler.reset()
-            else:
-                log("unknown event: %s\n" % hextools.bytes2hex(msg))
-
-    def r_apdu(self, msg):
-        self.usb_ctrl_OUT(CMD_R_APDU, msg)
-
-    def command(self, tag, payload=[]):  # dummy byte
-        log("CMD %d %s\n" % (tag, hextools.bytes2hex(payload)))
-        self.usb_ctrl_OUT(tag, payload)
-
-
-
-    def tick(self):
-        c = self.c_apdu()
-        r = self.handler.apdu(c)
-        self.r_apdu(r)
-        gsmtap.log(c,r)
-        log("C-APDU:%s\n" % hextools.bytes2hex(c))
-        pretty_apdu(c)
-        log("R-APDU:%s\n" % hextools.bytes2hex(r))
-
-
-    def mainloop(self):
-        while 1:
-            self.tick()
-
-    def reboot(self):
-        adb = "/opt/xc/android/android-sdk-linux/platform-tools/adb"
-        log("adb shell reboot\n")
-        subprocess.call([adb, "shell", "reboot"])
-
-    def run(self):
-        self.command(CMD_SET_ATR, self.handler.getATR())
-        self.command(CMD_SET_SKIP, u32(1))
-        self.command(CMD_HALT)
-
-        # start handling incoming phone C-APDUs
-        self.reboot()
-        self.mainloop()
-
 
 
 
 # Implements the handler interface
-class apdu_smartcard:
+class pyscard_smartcard:
     def __init__(self, index=0):
         self.connect(index)
         # self.force_SIM = True
@@ -210,8 +111,8 @@ class apdu_smartcard:
 
 
 
-simcard = apdu_smartcard()
-mitm = apdu_fw(handler = simcard)
+simcard = pyscard_smartcard(0)
+mitm = apdufw.forwarder(handler = simcard)
 
 mitm.run()
 
