@@ -121,6 +121,7 @@ enum iso7816_state {
     S_TPDU_DATA,
     S_TPDU_WAIT_REPLY,
     S_TPDU_REPLY,
+    S_TPDU_REPLY_PROC,
     S_TPDU_RESP,
 
     /* LOW-LEVEL RX/TX: io_next contains next state after I/O is done */
@@ -469,7 +470,6 @@ void iso7816_slave_tick(struct iso7816_slave *s) {
 
         switch(s->msg.tpdu.ins) {
 
-            /* GENERAL CASE */
         case INS_STATUS:
         case INS_UNBLOCK_PIN:
         case INS_VERIFY:
@@ -482,23 +482,17 @@ void iso7816_slave_tick(struct iso7816_slave *s) {
             /* data in R-APDU */
             s->c_apdu_size = sizeof(struct tpdu);
             s->r_apdu_size = size + 2;
+            /* No procedure byte at this time */
+            s->state = S_TPDU_PROC;
             break;
+
         default:
-            // if (s->msg.tpdu.ins == INS_UNBLOCK_PIN) size = 1;
             /* data in C-APDU */
             s->c_apdu_size = sizeof(struct tpdu) + size;
             s->r_apdu_size = 2;
+            /* Send procedure byte if there is more data to obtain from phone. */
+            next_send(s, S_TPDU_PROC, &s->msg.tpdu.ins, size ? 1 : 0);
         }
-        if (1) {
-            // FIXME: in general, do not send procedure byte for
-            // failing commands that would return data SIM->PHONE.
-            const uint8_t status_hack[] = {0x80, 0xF2, 0x00, 0x01, 0xFF};
-            if (0 == memcmp(status_hack, &s->msg.tpdu, sizeof(status_hack))) {
-                size = 0;
-            }
-        }
-        /* Send procedure byte if there is data to transfer. */
-        next_send(s, S_TPDU_PROC, &s->msg.tpdu.ins, size ? 1 : 0);
         break;
     }
     case S_TPDU_PROC: {
@@ -517,6 +511,10 @@ void iso7816_slave_tick(struct iso7816_slave *s) {
         /* Wait for data provided by is7816_slave_r_apdu() */
         break;
     case S_TPDU_REPLY:
+        /* Send procedure byte if there is any payload to send to phone. */
+        next_send(s, S_TPDU_REPLY_PROC, &s->msg.tpdu.ins, (s->r_apdu_size > 2) ? 1 : 0);
+        break;
+    case S_TPDU_REPLY_PROC:
         /* Send response data + SW */
         TRACE_DEBUG("S_TPDU_REPLY\n\r");
         next_send(s, S_TPDU_RESP,
