@@ -46,13 +46,7 @@ class pyscard_smartcard:
             if (c_apdu[0] != 0xA0):
                 return [0x6E, 0x00]
 
-        if (c_apdu[1] == 0x10): # TERMINAL_PROFILE
-            data, sw1, sw2 = self.card.transmit( list(c_apdu) )
-            # Make phone poll for command
-            # return pack(data,0x91,0x20)
-            return pack(data,sw1,sw2)
-
-        # Delegate to MIM.
+        # Delegate
         (data,sw1,sw2) = self.card.transmit( list(c_apdu) )
         return pack(data,sw1,sw2)
 
