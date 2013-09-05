@@ -492,6 +492,7 @@ void iso7816_slave_tick(struct iso7816_slave *s) {
             s->r_apdu_size = 2;
             /* Send procedure byte if there is more data to obtain from phone. */
             next_send(s, S_TPDU_PROC, &s->msg.tpdu.ins, size ? 1 : 0);
+            break;
         }
         break;
     }
