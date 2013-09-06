@@ -105,9 +105,12 @@ class forwarder:
         r = self.srv.apdu(c)
         self.r_apdu(r)
         gsmtap.log(c,r)
-        self.log("C-APDU:%s\n" % hextools.bytes2hex(c))
+        h_c = hextools.bytes2hex(c)
+        h_r = hextools.bytes2hex(r)
+        self.log("C-APDU:%s\n" % h_c)
         pretty_apdu(c, self.log)
-        self.log("R-APDU:%s\n" % hextools.bytes2hex(r))
+        self.log("R-APDU:%s\n" % h_r)
+        self.log("APDU:%s%s\n" % (h_c, h_r))
 
 
     def mainloop(self):
