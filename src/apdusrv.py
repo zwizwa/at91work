@@ -7,6 +7,15 @@
 # .reset()
 
 import smartcard
+import hextools
+import sys
+log = sys.stderr.write
+try:
+    from pySim.transport.serial import SerialSimLink
+except:
+    log("FIXME: pySim.transport.serial not found\n")
+
+
 
 def pack(reply,sw1,sw2):
     p = list(reply)
@@ -51,4 +60,24 @@ class pyscard_smartcard:
         return pack(data,sw1,sw2)
 
 
+
+class pySim_serial:
+    def __init__(self, dev):
+        self.connect(dev)
+
+    def connect(self, dev):
+        self.sl = SerialSimLink(device=dev)
+        self.sl.wait_for_card()
+
+    def apdu(self, msg):
+        r, s = self.sl.send_apdu(hextools.hex(msg))
+        rapdu = hextools.bytes(r)
+        rapdu.extend(hextools.bytes(s))
+        return rapdu
+
+    def disconnect(self):
+        raise Exception("NI: disconnect()")
+
+    def getATR(self):
+        raise Exception("NI: getATR()")
 
