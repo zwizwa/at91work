@@ -1,7 +1,7 @@
 # SIMtrace APDU forwarder, host side.
 
 import sys
-import simconst
+import sym
 import subprocess
 
 import gsmtap
@@ -33,17 +33,17 @@ def pretty_apdu(msg, log=sys.stderr.write):
   try:  
     ins = msg[1]
     try:
-        log(" %s" % simconst.iso7816[ins])
+        log(" %s" % sym.iso7816[ins])
     except:
         log(" %02X" % ins)
         pass
     if (msg[1] == 0xA4): # SELECT_FILE
         file = msg[5] * 256 + msg[6]
         try:
-            log(" %s" % simconst.USIMConstants[file])
+            log(" %s" % sym.USIM_FID[file])
         except:
             try:
-                log(" %s" % simconst.SIMConstants[file])
+                log(" %s" % sym.SIM_FID[file])
             except:
                 log(" %04X" % file)
                 pass
@@ -52,9 +52,23 @@ def pretty_apdu(msg, log=sys.stderr.write):
   except:
     pass
 
+class default_console:
+    def __init__(self):
+        pass
+    def poll(self):
+        pass
 
 class forwarder:
-    def __init__(self, srv, idVendor=0x03eb, idProduct=0x6119, log=sys.stderr.write):
+    def __init__(self, srv,
+                 idVendor=0x03eb,
+                 idProduct=0x6119,
+                 log=sys.stderr.write,
+                 verbose=2,
+                 log_apdu_prefix="APDU:",
+                 console=default_console()):
+        self.verbose = verbose
+        self.console = console
+        self.log_apdu_prefix = log_apdu_prefix
         self.srv = srv
         self.log = log
         self.dev = usb_find(idVendor, idProduct)
@@ -73,11 +87,12 @@ class forwarder:
     def log(self, msg):
         sys.stderr.write(msg)
 
-    # FIXME: make this a proper event-handler loop
     def c_apdu(self):
         while True:
             msg = []
+            # FIXME: This is the main event loop.  Move it to top level.
             while (not len(msg)):
+                self.console.poll()
                 msg = self.usb_ctrl_IN(CMD_POLL)
 
             evt = msg[0]
@@ -86,7 +101,8 @@ class forwarder:
                 return data
 
             if (evt == EVT_RESET):
-                self.log("RESET CARD\n")
+                if self.verbose>0:
+                    self.log("RESET CARD\n")
                 self.srv.reset()
             else:
                 self.log("unknown event: %s\n" % hextools.bytes2hex(msg))
@@ -95,7 +111,8 @@ class forwarder:
         self.usb_ctrl_OUT(CMD_R_APDU, msg)
 
     def command(self, tag, payload=[]):  # dummy byte
-        self.log("CMD %d %s\n" % (tag, hextools.bytes2hex(payload)))
+        if self.verbose>0:
+            self.log("CMD %d %s\n" % (tag, hextools.bytes2hex(payload)))
         self.usb_ctrl_OUT(tag, payload)
 
 
@@ -107,10 +124,14 @@ class forwarder:
         gsmtap.log(c,r)
         h_c = hextools.bytes2hex(c)
         h_r = hextools.bytes2hex(r)
-        self.log("C-APDU:%s\n" % h_c)
-        pretty_apdu(c, self.log)
-        self.log("R-APDU:%s\n" % h_r)
-        self.log("APDU:%s%s\n" % (h_c, h_r))
+        # Human readable debugging
+        if (self.verbose>1):
+            self.log("C-APDU:%s\n" % h_c)
+            pretty_apdu(c, self.log)
+            self.log("R-APDU:%s\n" % h_r)
+        # This is useful for attaching an APDU parser on console.
+        if (self.log_apdu_prefix):
+            self.log("%s%s%s\n" % (self.log_apdu_prefix, h_c, h_r))
 
 
     def mainloop(self):

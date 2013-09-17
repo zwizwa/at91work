@@ -10,9 +10,31 @@ def bytes(x):
     return x
 
 def hex(x):
-    if type(x) != str:
-        x = bytes2hex(x)
-    return x
+    if type(x) == str:
+        return x
+    if type(x) == int:
+        return be_int_bytes(x)
+    if type(x) == list:
+        return bytes2hex(x)
+    if type(x) == bytearray:
+        return bytes2hex(x)
+    raise Exception(x)
+
+def le_int_bytes(i):
+    lst = []
+    while (i != 0):
+        lst.append(i & 0xFF)
+        i = i >> 8
+    return lst
+def be_int_bytes(i):
+    lst = le_int_bytes(i)
+    lst.reverse()
+    return lst
+        
+# Remove spaces
+def strip(str):
+    return str.replace(" ", "")
+
 
 # see iso7816_slave.h
 # AT91 is little endian.
@@ -48,10 +70,51 @@ def all_FF(msg):
             return False
     return True
 
+def pathstring(path):
+    return "".join(map((lambda p: "/%s" % hex(p)), path))
+
+
+def decode_BCD(data=[]):
+    string = ''
+    for B in data:
+        string += str( B & 0x0F )
+        hidig = B >> 4
+        if (hidig < 10):
+            string += str( hidig )
+    return string 
+
+def encode_BCD(data=[]):
+    data = map(lambda x: ord(x)-ord('0'), data)
+    acc = []
+    while len(data):
+        head = data[0:2]
+        data = data[2:]
+        if (len(head) == 1):
+            head.append(0xF)
+        byte = head[0] + 0x10 * head[1]
+        acc.append(byte)
+    return acc
+    
+
+
 
 def test():
-    print "BE %08X" % be_int([0,1,2,3])
-    print "LE %08X" % le_int([0,1,2,3])
+    assert "00010203" == hex([0,1,2,3])
+    assert "ABCD" == hex("ABCD")
+    assert [0x7F, 0] == hex(0x7F00)
+    assert 0x00010203 == be_int([0,1,2,3])
+    assert 0x03020100 == le_int([0,1,2,3])
+    assert "/A/B" == pathstring(["A","B"])
+
+    assert [0x21,0x43] == encode_BCD("1234")
+    assert "1234"      == decode_BCD([0x21,0x43])
+    assert [0x21,0xF3] == encode_BCD("123")
+    assert "123"       == decode_BCD([0x21,0xF3])
+
+    print "test OK"
+
+
+    
 
 if __name__ == '__main__':
     test()

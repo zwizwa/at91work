@@ -30,9 +30,7 @@ def hex2bytes(hex):
 
 # input = bytes
 def log(c_apdu, r_apdu=[]):
-    msg = list(gsmtap_hdr)
-    msg.extend(c_apdu)
-    msg.extend(r_apdu)
+    msg = list(gsmtap_hdr) + list(c_apdu) + list(r_apdu)
     gsmtap_sock.sendto(bytes2str(msg), gsmtap_addr)
 
 # input = hex string
