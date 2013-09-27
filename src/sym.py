@@ -1,18 +1,55 @@
+# LICENSE: GPL2
+# (c) 2013 Tom Schouten <tom@getbeep.com>
+
 # Central place to store all symbolic<->numeric tag conversions.
 
 # Build bi-directional lookup with some automatic conversion
-class sym_lookup:
-    def __init__(self, num_to_sym):
+
+# Sentinel
+class empty_table:
+    def __getattr__(self, key):
+        raise Exception("symbolic key not found: %s" % key)
+    def __getitem__(self, key):
+        raise Exception("numeric key not found: %s" % key)
+
+class sym_table:
+    def __init__(self, num_to_sym, parent = empty_table()):
+        self.parent = parent
         self.n2s = num_to_sym
-        for k,v in self.n2s.items():
-            setattr(self, v, k)
-    def __call__(self, val):
-        return self.__getitem__(val)
-    def __getitem__(self, val):
-        return self.n2s[val]
+        self.s2n = dict([(s,n) for n,s in num_to_sym.items()])
+    # table.key
+    def __getattr__(self, key):
+        try:
+            return self.s2n[key]
+        except:
+            return self.parent.__getattr__(key)
+    # table[key]
+    def __getitem__(self, key):
+        try:
+            return self.n2s[key]
+        except:
+            return self.parent.__getitem__(key)
+
+
+# ETSI TS 102 221 - 10.2.1 Status conditions returned by the UICC
+SW1 = sym_table({
+    0x91 : 'OK_INFO_PROACTIVE_COMMAND',
+    0x92 : 'OK_INFO_DATA_TRANSFER',
+})
+SW = sym_table({
+    0x9000 : 'OK',
+    0x9300 : 'TOOLKIT_BUSY',
+    0x6282 : 'FILE_INVALID',
+    0x6283 : 'FILE_INVALID',
+    0x6700 : 'WRONG_LENGTH',
+    0x6981 : 'INCOMPATIBLE_FILE_STRUCTURE',
+    0x6982 : 'SECURITY_STATUS',
+    0x6985 : 'CONDITIONS_OF_USE_NOT_SATISFIED',
+    0x6A82 : 'FILE_NOT_FOUND',
+})
             
 
-iso7816 = sym_lookup({
+iso7816 = sym_table({
     0x04 : 'DEACTIVATE_FILE',
     0x0E : 'ERASE_BINARY',
     0x10 : 'TERMINAL_PROFILE',
@@ -50,7 +87,7 @@ iso7816 = sym_lookup({
     0xF2 : 'STATUS',
 })
 
-SIM_FID = sym_lookup({
+SIM_FID = sym_table({
     0x3F00 : 'MF',
     0x7F10 : 'DF_TELECOM',
     0x7F20 : 'DF_GSM',
@@ -93,6 +130,7 @@ SIM_FID = sym_lookup({
     0x4F20 : 'EF_IMG',
     0x6F05 : 'EF_LP',
     0x6F07 : 'EF_IMSI',
+    0x6F16 : 'EF_CPHS', # nonstandard / Common PCN Handset Specification?
     0x6F20 : 'EF_KC',
     0x6F30 : 'EF_PLMNSEL',
     0x6F31 : 'EF_HPLMN',
@@ -157,7 +195,9 @@ SIM_FID = sym_lookup({
     0x4F43 : 'EF_TPRPK',
 })
 
-USIM_FID = sym_lookup({
+USIM_FID = sym_table({
+    0x2F00 : 'EF_DIR',
+    0x2F06 : 'EF_ARR',
     0x3F00 : 'MF',
     0x7FFF : 'ADF',
     0x6F05 : 'EF_LI',
@@ -280,13 +320,47 @@ USIM_FID = sym_lookup({
     0x4F84 : 'EF_OCSGL',
     0x4F85 : 'EF_OCSGT',
     0x4F86 : 'EF_OHNBN',
+},
+parent = SIM_FID
+)
+
+# ETSI TS 102 223 - 9.4
+proactive_command = sym_table({
+    0x03 : 'POLL_INTERVAL',
+    0x13 : 'SEND_SHORT_MESSAGE',
+    0x16 : 'GEOGRAPHICAL_LOCATION_REQUEST',
+})
+    
+# ETSI TS 101 220 - 7.2 Assigned TLV tag values
+# Card application toolkit templates
+cat = sym_table({
+    0xD0 : 'PROACTIVE_COMMAND',
+    0xD1 : 'SMS_PP_DOWNLOAD',
 })
 
+# ETSI TS 101 220 - 7.2 Assigned TLV tag values
+# Card application toolkit data objects
+cat_data = sym_table({
+    0x81 : 'COMMAND_DETAILS',
+    0x82 : 'DEVICE_IDENTITY',
+    0x0B : 'SMS_PDU',
+})
 
 def test():
     assert iso7816[0xF2]  == 'STATUS'
-    assert iso7816(0xF2)  == 'STATUS'
     assert iso7816.STATUS == 0xF2
+    assert SIM_FID[0x7F10] == 'DF_TELECOM'
+    assert SIM_FID.DF_TELECOM == 0x7F10
+    assert USIM_FID[0x7F10] == 'DF_TELECOM'  # delegation
+    assert USIM_FID.DF_TELECOM == 0x7F10     # delegation
+    try:
+        USIM_FID[-1]
+    except Exception as e:
+        pass
+    try:
+        USIM_FID.bad_key
+    except Exception as e:
+        pass
     print "test OK"
 
 if __name__ == '__main__':

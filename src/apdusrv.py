@@ -1,4 +1,6 @@
 # SIMtrace APDU service providers.  (e.g. SIM cards, MITMs, ...)
+# LICENSE: GPL2
+# (c) 2013 Tom Schouten <tom@getbeep.com>
 
 # These classes implement the handler interface passed to an apdufw.forwarder object:
 #

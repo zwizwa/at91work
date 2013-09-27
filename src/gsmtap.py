@@ -1,3 +1,6 @@
+# LICENSE: GPL2
+# (c) 2013 Tom Schouten <tom@getbeep.com>
+
 import socket
 import struct
 

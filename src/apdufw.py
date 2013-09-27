@@ -1,4 +1,6 @@
 # SIMtrace APDU forwarder, host side.
+# LICENSE: GPL2
+# (c) 2013 Tom Schouten <tom@getbeep.com>
 
 import sys
 import sym
@@ -65,12 +67,16 @@ class forwarder:
                  log=sys.stderr.write,
                  verbose=2,
                  log_apdu_prefix="APDU:",
-                 console=default_console()):
+                 console=default_console(),
+                 atr=None,
+                 tracefile=False):
         self.verbose = verbose
         self.console = console
+        self.tracefile = tracefile
         self.log_apdu_prefix = log_apdu_prefix
         self.srv = srv
         self.log = log
+        self.atr = atr
         self.dev = usb_find(idVendor, idProduct)
         self.dh = self.dev.open()
 
@@ -93,7 +99,7 @@ class forwarder:
             # FIXME: This is the main event loop.  Move it to top level.
             while (not len(msg)):
                 self.console.poll()
-                msg = self.usb_ctrl_IN(CMD_POLL)
+                msg = list(self.usb_ctrl_IN(CMD_POLL))
 
             evt = msg[0]
             if (evt == EVT_C_APDU):
@@ -129,6 +135,13 @@ class forwarder:
             self.log("C-APDU:%s\n" % h_c)
             pretty_apdu(c, self.log)
             self.log("R-APDU:%s\n" % h_r)
+        # C/R trace file
+        if (self.tracefile):
+            f = open(self.tracefile, 'a')
+            f.write("C-APDU:%s\n" % h_c)
+            f.write("R-APDU:%s\n" % h_r)
+            f.close()
+            
         # This is useful for attaching an APDU parser on console.
         if (self.log_apdu_prefix):
             self.log("%s%s%s\n" % (self.log_apdu_prefix, h_c, h_r))
@@ -143,8 +156,14 @@ class forwarder:
         self.log("adb shell reboot\n")
         subprocess.call([adb, "shell", "reboot"])
 
+    def getATR(self):
+        if self.atr is not None:
+            return self.atr
+        else:
+            return self.srv.getATR()
+
     def run(self):
-        self.command(CMD_SET_ATR, self.srv.getATR())
+        self.command(CMD_SET_ATR, self.getATR())
         self.command(CMD_SET_SKIP, hextools.u32(1))
         self.command(CMD_HALT)
 

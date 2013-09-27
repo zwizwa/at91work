@@ -1,8 +1,17 @@
+# LICENSE: GPL2
+# (c) 2013 Tom Schouten <tom@getbeep.com>
+
+import array
+import sym
+
 def bytes2hex(bytes):
     return "".join(map(lambda v: "%02X"%v, bytes))
 
 def hex2bytes(hex):
     return map(ord,hex.decode("hex"))
+
+def bytes2string(bytes):
+    return array.array('B',bytes).tostring()
 
 def bytes(x):
     if type(x) == str:
@@ -16,9 +25,14 @@ def hex(x):
         return be_int_bytes(x)
     if type(x) == list:
         return bytes2hex(x)
+    if type(x) == tuple:
+        return bytes2hex(list(x))
     if type(x) == bytearray:
         return bytes2hex(x)
     raise Exception(x)
+
+def string(x):
+    return bytes2string(bytes(x))
 
 def le_int_bytes(i):
     lst = []
@@ -35,6 +49,19 @@ def be_int_bytes(i):
 def strip(str):
     return str.replace(" ", "")
 
+
+class chunks:
+    def __init__(self, lst, nb):
+        self.lst = lst
+        self.nb = nb
+    def __iter__(self):
+        return self
+    def next(self):
+        if not len(self.lst):
+            raise StopIteration
+        rv = self.lst[0:self.nb]
+        self.lst = self.lst[self.nb:]
+        return rv
 
 # see iso7816_slave.h
 # AT91 is little endian.
@@ -95,7 +122,11 @@ def encode_BCD(data=[]):
         acc.append(byte)
     return acc
     
-
+def fid_name(fid):
+    try:
+        return sym.USIM_FID[be_int(fid)]
+    except:
+        return hex(fid)
 
 
 def test():
@@ -111,7 +142,9 @@ def test():
     assert [0x21,0xF3] == encode_BCD("123")
     assert "123"       == decode_BCD([0x21,0xF3])
 
-    print "test OK"
+    assert [[1,2],[3,4]] == [x for x in chunks([1,2,3,4], 2)]
+
+    print "hextools: OK"
 
 
     
