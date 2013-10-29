@@ -509,7 +509,8 @@ void USBDCallbacks_Suspended(void)
 
 
 /* Patch iso7816 parser to USB control transfer. */
-static void c_apdu_cb(void *ctx, int size) {
+static void c_apdu_cb(void *ctx,  enum iso7816_slave_evt event,
+                      const uint8_t *buf, int size) {
     // UsbDataSent(0, 0, 0, 0);
 }
 
@@ -549,6 +550,7 @@ int main( void )
 
     ISO7816_Init( pinIso7816RstMC );
 
+
     // USB audio driver initialization
     CCIDDriver_Initialize();
     
@@ -560,6 +562,8 @@ int main( void )
     CCID_Insertion();
 
     /* Init phone ISO7816 USART */
+
+    // FIXME: re-enable
     iso7816_slave = iso7816_slave_init(c_apdu_cb, NULL);
 
     // Infinite loop
@@ -567,6 +571,8 @@ int main( void )
 
         // Poll I/O state machine.  FIXME: disable interrupts as there
         // is contention with USB callbacks.
+
+        // FIXME: re-enable
         iso7816_slave_tick(iso7816_slave);
 
         if( USBState == STATE_SUSPEND ) {

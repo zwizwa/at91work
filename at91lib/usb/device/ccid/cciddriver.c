@@ -57,8 +57,7 @@
 
 // Due to lack of physical endpoints, the SIMtrace phone interface is
 // handled by control requests over EP0
-void simtrace_vendor_request(const USBGenericRequest *request);
-
+void usb_control_vendor_request(const USBGenericRequest *request);
 
 //------------------------------------------------------------------------------
 //         Local definition
@@ -1377,7 +1376,7 @@ static void CCID_RequestHandler(const USBGenericRequest *pRequest)
     else if (USBGenericRequest_GetType(pRequest) == USBGenericRequest_VENDOR) {
 
         // Forward SIMtrace VENDOR request.
-        simtrace_vendor_request(pRequest);
+        usb_control_vendor_request(pRequest);
     }
     else {
 

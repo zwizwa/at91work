@@ -45,11 +45,11 @@ BOARD = simtrace
 # TRACE_LEVEL_ERROR      2
 # TRACE_LEVEL_FATAL      1
 # TRACE_LEVEL_NO_TRACE   0
-TRACE_LEVEL = 3
+TRACE_LEVEL = 5
 
 # Optimization level, put in comment for debugging
 # OPTIMIZATION = -Os
-OPTIMIZATION = -Os -Wno-format -Werror -Wno-unused-but-set-variable -Wno-unused-variable
+OPTIMIZATION = -Os -Wno-format -Wno-unused-but-set-variable -Wno-unused-variable # -Werror
 
 # AT91 library directory
 AT91LIB = ../at91lib
