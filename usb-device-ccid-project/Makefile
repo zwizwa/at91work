@@ -45,7 +45,7 @@ BOARD = simtrace
 # TRACE_LEVEL_ERROR      2
 # TRACE_LEVEL_FATAL      1
 # TRACE_LEVEL_NO_TRACE   0
-TRACE_LEVEL = 5
+TRACE_LEVEL = 3
 
 # Optimization level, put in comment for debugging
 # OPTIMIZATION = -Os

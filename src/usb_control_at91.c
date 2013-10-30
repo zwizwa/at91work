@@ -57,6 +57,7 @@ static void write_cb(void *arg,
    Countrol out = SETUP OUT [OUT ...] STATUS(=IN) */
 
 void usb_control_vendor_request(const USBGenericRequest *request) {
+    // TRACE_WARNING("%d", request->bRequest);
     TRACE_DEBUG("vendor request %02X %d %d %d %d\n\r",
                 request->bmRequestType,
                 request->bRequest,

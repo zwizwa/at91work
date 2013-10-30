@@ -575,6 +575,14 @@ int main( void )
         // FIXME: re-enable
         iso7816_slave_tick(iso7816_slave);
 
+        // Device is not configured
+        if (USBD_GetState() < USBD_STATE_CONFIGURED) {
+
+            // Connect pull-up, wait for configuration
+            USBD_Connect();
+            while (USBD_GetState() < USBD_STATE_CONFIGURED);
+        }
+
         if( USBState == STATE_SUSPEND ) {
             TRACE_DEBUG("suspend  !\n\r");
             LowPowerMode();

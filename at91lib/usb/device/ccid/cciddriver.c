@@ -1338,6 +1338,7 @@ static void CCIDCommandDispatcher( void )
 static void CCID_RequestHandler(const USBGenericRequest *pRequest)
 {
     TRACE_DEBUG("CCID_RHl\n\r");
+    static const unsigned int dummy_data_rates = 9600;
 
     // Check if this is a class request
     if (USBGenericRequest_GetType(pRequest) == USBGenericRequest_CLASS) {
@@ -1359,6 +1360,10 @@ static void CCID_RequestHandler(const USBGenericRequest *pRequest)
                 TRACE_DEBUG("Not supported: GET_DATA_RATES\n\r");
                 // A CCID with bNumDataRatesSupported equal to 00h does not have 
                 // to support this request.
+
+                // Due to a bug in libccid, we still get queried.  Add
+                // a workaround here.
+                USBD_Write(0, &dummy_data_rates, sizeof(dummy_data_rates), 0, 0);
                 break;
 
             default:

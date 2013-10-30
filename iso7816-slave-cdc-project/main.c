@@ -46,7 +46,6 @@
 #include <usb/device/cdc-serial/CDCDSerialDriverDescriptors.h>
 #include <pmc/pmc.h>
 #include <string.h>
-#include "hexin.h"
 
 #include "usb_control_at91.h"
 
@@ -171,20 +170,6 @@ void USBDCallbacks_Suspended(void)
     USBState = STATE_SUSPEND;
 }
 
-
-/* Use newline-terminated ASCII hex on CDC I/O to wrap a binary packet
-   interface in the simplest way possible.
-
-   This ad-hoc protocol was easiest to implement considering a single
-   use case: a python program tying into pyscard.
-
-   Replacing the packet transport with something else is trivial: see
-   is7816*_apdu_* calls. */
-
-static uint8_t hexin_buf[512];
-static struct hexin h = {.buf = hexin_buf};
-
-static char hexout_buf[DATABUFFERSIZE];
 
 // FIXME: CDC EPs are not used in this example
 
